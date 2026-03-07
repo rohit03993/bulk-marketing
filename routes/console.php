@@ -9,7 +9,5 @@ Artisan::command('inspire', function () {
 })->purpose('Display an inspiring quote');
 
 // Process queued campaign jobs every minute (no separate queue worker needed if cron runs schedule:run).
-Schedule::command('queue:work', [
-    '--stop-when-empty' => true,
-    '--max-time' => 55,
-])->everyMinute()->withoutOverlapping();
+// Use queue:work-once wrapper so --stop-when-empty is not passed with a value (avoids Symfony "option does not accept a value" in subprocess).
+Schedule::command('queue:work-once')->everyMinute()->withoutOverlapping();
