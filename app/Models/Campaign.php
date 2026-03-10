@@ -22,12 +22,15 @@ class Campaign extends Model
         'started_at',
         'finished_at',
         'created_by',
+        'shot_by',
+        'shot_at',
     ];
 
     protected $casts = [
         'scheduled_at' => 'datetime',
         'started_at' => 'datetime',
         'finished_at' => 'datetime',
+        'shot_at' => 'datetime',
     ];
 
     public function school()
@@ -48,6 +51,11 @@ class Campaign extends Model
     public function recipients()
     {
         return $this->hasMany(CampaignRecipient::class);
+    }
+
+    public function shotByUser()
+    {
+        return $this->belongsTo(User::class, 'shot_by');
     }
 }
 

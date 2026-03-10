@@ -3,16 +3,22 @@
 namespace App\Http\Controllers;
 
 use App\Models\AcademicSession;
+use App\Models\AisensyTemplate;
+use App\Models\Campaign;
+use App\Models\CampaignRecipient;
 use App\Models\ClassSection;
 use App\Models\School;
 use App\Models\Student;
+use App\Models\StudentCall;
+use App\Jobs\RunCampaignJob;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 
 class StudentController extends Controller
 {
     public function index(Request $request)
     {
-        $query = Student::with(['classSection.school', 'classSection.academicSession'])
+        $query = Student::with(['classSection.school', 'classSection.academicSession', 'tags'])
             ->orderBy('name');
 
         if ($request->filled('school_id')) {
@@ -32,12 +38,26 @@ class StudentController extends Controller
                 ->orWhere('whatsapp_phone_primary', 'like', "%{$s}%"));
         }
 
+        // Optional filter by assignee (admin only).
+        $currentUser = $request->user();
+        $assignedToOptions = [];
+        if ($currentUser && $currentUser->isAdmin()) {
+            if ($request->filled('assigned_to')) {
+                if ($request->assigned_to === 'unassigned') {
+                    $query->whereNull('assigned_to');
+                } elseif ($request->assigned_to !== 'all') {
+                    $query->where('assigned_to', $request->assigned_to);
+                }
+            }
+            $assignedToOptions = \App\Models\User::orderBy('name')->get();
+        }
+
         $students = $query->paginate(20)->withQueryString();
         $schools = School::orderBy('name')->get();
         $sessions = AcademicSession::orderByDesc('starts_at')->get();
         $classSections = ClassSection::with('school')->orderBy('class_name')->orderBy('section_name')->get();
 
-        return view('crm.students.index', compact('students', 'schools', 'sessions', 'classSections'));
+        return view('crm.students.index', compact('students', 'schools', 'sessions', 'classSections', 'assignedToOptions'));
     }
 
     public function create()
@@ -66,8 +86,10 @@ class StudentController extends Controller
                 }
             }],
             'status' => 'in:active,inactive',
+            'lead_status' => 'required|in:lead,interested,not_interested,walkin_done,admission_done,follow_up_later',
         ]);
         $valid['status'] = $valid['status'] ?? 'active';
+        $valid['lead_status'] = $valid['lead_status'] ?? 'lead';
 
         $valid['whatsapp_phone_primary'] = Student::normalizeIndianPhone($valid['whatsapp_phone_primary'] ?? '') ?: null;
         $valid['whatsapp_phone_secondary'] = Student::normalizeIndianPhone($valid['whatsapp_phone_secondary'] ?? '') ?: null;
@@ -95,7 +117,12 @@ class StudentController extends Controller
         $student->load('classSection.school', 'classSection.academicSession');
         $classSections = ClassSection::with('school', 'academicSession')->orderBy('class_name')->orderBy('section_name')->get();
 
-        return view('crm.students.edit', compact('student', 'classSections'));
+        $assignableUsers = [];
+        if (Auth::user()?->isAdmin()) {
+            $assignableUsers = \App\Models\User::orderBy('name')->get();
+        }
+
+        return view('crm.students.edit', compact('student', 'classSections', 'assignableUsers'));
     }
 
     public function update(Request $request, Student $student)
@@ -117,6 +144,8 @@ class StudentController extends Controller
                 }
             }],
             'status' => 'in:active,inactive',
+            'lead_status' => 'required|in:lead,interested,not_interested,walkin_done,admission_done,follow_up_later',
+            'assigned_to' => 'nullable|exists:users,id',
         ]);
 
         $valid['whatsapp_phone_primary'] = Student::normalizeIndianPhone($valid['whatsapp_phone_primary'] ?? '') ?: null;
@@ -134,8 +163,157 @@ class StudentController extends Controller
             ]);
         }
 
+        // Only admins can change assignment explicitly.
+        if (! Auth::user()?->isAdmin()) {
+            unset($valid['assigned_to']);
+        }
+
         $student->update($valid);
 
         return redirect()->route('students.index')->with('success', __('Student updated.'));
+    }
+
+    public function updateLeadStatus(Request $request, Student $student)
+    {
+        $data = $request->validate([
+            'lead_status' => 'required|in:lead,interested,not_interested,walkin_done,admission_done,follow_up_later',
+        ]);
+
+        $student->update(['lead_status' => $data['lead_status']]);
+
+        return back()->with('success', __('Lead status updated.'));
+    }
+
+    public function show(Request $request, Student $student)
+    {
+        $student->load([
+            'classSection.school',
+            'classSection.academicSession',
+            'tags',
+            'assignedTo',
+            'assignedBy',
+        ]);
+
+        $calls = StudentCall::where('student_id', $student->id)
+            ->with('user')
+            ->orderByDesc('called_at')
+            ->limit(100)
+            ->get();
+
+        $phones = $student->getWhatsappPhones();
+        $recipientsQuery = CampaignRecipient::query()
+            ->with(['campaign.school', 'campaign.template', 'campaign.shotByUser'])
+            ->orderByDesc('created_at');
+
+        $recipientsQuery->where('student_id', $student->id);
+        if (! empty($phones)) {
+            $recipientsQuery->orWhereIn('phone', $phones);
+        }
+
+        $messages = $recipientsQuery->limit(100)->get();
+
+        $templates = AisensyTemplate::orderBy('name')->get();
+
+        return view('crm.students.show', compact('student', 'calls', 'messages', 'phones', 'templates'));
+    }
+
+    public function sendSingleMessage(Request $request, Student $student)
+    {
+        $data = $request->validate([
+            'aisensy_template_id' => 'required|exists:aisensy_templates,id',
+            'phone' => 'required|string',
+        ]);
+
+        $phone = Student::normalizeIndianPhone($data['phone']);
+        if (! $phone || ! in_array($phone, $student->getWhatsappPhones(), true)) {
+            return back()->with('error', __('Invalid phone number for this student.'));
+        }
+
+        $classSection = $student->classSection;
+        if (! $classSection || ! $classSection->school_id) {
+            return back()->with('error', __('Student is not linked to a school/class; cannot send template message.'));
+        }
+
+        $template = AisensyTemplate::findOrFail($data['aisensy_template_id']);
+
+        $campaign = Campaign::create([
+            'name' => 'Direct: '.$template->name.' → '.$student->name,
+            'school_id' => $classSection->school_id,
+            'academic_session_id' => $classSection->academic_session_id,
+            'aisensy_template_id' => $template->id,
+            'status' => 'queued',
+            'total_recipients' => 1,
+            'sent_count' => 0,
+            'failed_count' => 0,
+            'created_by' => $request->user()?->id,
+            'shot_by' => $request->user()?->id,
+            'shot_at' => now(),
+        ]);
+
+        CampaignRecipient::create([
+            'campaign_id' => $campaign->id,
+            'student_id' => $student->id,
+            'phone' => $phone,
+            'status' => 'pending',
+        ]);
+
+        RunCampaignJob::dispatch($campaign->id);
+
+        return back()->with('success', __('Message queued to send for this student.'));
+    }
+
+    public function profileEdit(Request $request, Student $student)
+    {
+        $user = $request->user();
+        if (! $user?->isAdmin() && (int) ($student->assigned_to ?? 0) !== (int) ($user?->id ?? 0)) {
+            abort(403, __('Access denied.'));
+        }
+
+        $student->load('classSection.school', 'classSection.academicSession');
+        $classSections = ClassSection::with('school')->orderBy('class_name')->orderBy('section_name')->get();
+
+        return view('crm.students.profile-edit', compact('student', 'classSections'));
+    }
+
+    public function profileUpdate(Request $request, Student $student)
+    {
+        $user = $request->user();
+        if (! $user?->isAdmin() && (int) ($student->assigned_to ?? 0) !== (int) ($user?->id ?? 0)) {
+            abort(403, __('Access denied.'));
+        }
+
+        $valid = $request->validate([
+            'class_section_id' => 'required|exists:class_sections,id',
+            'name' => 'required|string|max:255',
+            'father_name' => 'nullable|string|max:255',
+            'roll_number' => 'nullable|string|max:50',
+            'admission_number' => 'nullable|string|max:50',
+            'whatsapp_phone_primary' => ['nullable', 'string', 'max:14', function ($attr, $value, $fail) use ($student) {
+                if ($value !== null && $value !== '' && Student::normalizeIndianPhone($value) === null) {
+                    $fail(__('Enter a valid 10-digit Indian mobile number.'));
+                }
+                $n = Student::normalizeIndianPhone($value ?? '');
+                if ($n && Student::isPhoneUsedByOther($n, $student->id)) {
+                    $fail(__('This number is already used by another student.'));
+                }
+            }],
+            'whatsapp_phone_secondary' => ['nullable', 'string', 'max:14', function ($attr, $value, $fail) use ($student) {
+                if ($value !== null && $value !== '' && Student::normalizeIndianPhone($value) === null) {
+                    $fail(__('Enter a valid 10-digit Indian mobile number.'));
+                }
+                $n = Student::normalizeIndianPhone($value ?? '');
+                if ($n && Student::isPhoneUsedByOther($n, $student->id)) {
+                    $fail(__('This number is already used by another student.'));
+                }
+            }],
+            'lead_status' => 'required|in:lead,interested,not_interested,walkin_done,admission_done,follow_up_later',
+        ]);
+
+        $valid['whatsapp_phone_primary'] = Student::normalizeIndianPhone($valid['whatsapp_phone_primary'] ?? '') ?: null;
+        $valid['whatsapp_phone_secondary'] = Student::normalizeIndianPhone($valid['whatsapp_phone_secondary'] ?? '') ?: null;
+
+        $student->update($valid);
+
+        return redirect()->route('students.show', $student)->with('success', __('Student updated.'));
     }
 }

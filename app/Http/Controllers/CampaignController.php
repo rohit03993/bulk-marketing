@@ -157,7 +157,7 @@ class CampaignController extends Controller
 
     public function show(Campaign $campaign)
     {
-        $campaign->load(['school', 'template', 'recipients.student.classSection']);
+        $campaign->load(['school', 'template', 'shotByUser', 'recipients.student.classSection']);
         $sent = $campaign->recipients()->where('status', 'sent')->count();
         $failed = $campaign->recipients()->where('status', 'failed')->count();
         $pendingCount = $campaign->recipients()->where('status', 'pending')->count();
@@ -178,7 +178,16 @@ class CampaignController extends Controller
                 ->with('info', __('No pending recipients to send.'));
         }
         if ($campaign->status === 'draft') {
-            $campaign->update(['status' => 'queued']);
+            $campaign->update([
+                'status' => 'queued',
+                'shot_by' => auth()->id(),
+                'shot_at' => now(),
+            ]);
+        } else {
+            $campaign->update([
+                'shot_by' => auth()->id(),
+                'shot_at' => now(),
+            ]);
         }
         RunCampaignJob::dispatch($campaign->id);
 

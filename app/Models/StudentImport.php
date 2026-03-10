@@ -14,13 +14,20 @@ class StudentImport extends Model
         'academic_session_id',
         'import_class_name',
         'import_section_name',
+        'tag_name',
         'original_filename',
         'file_path',
         'status',
         'duplicate_phone_policy',
         'total_rows',
         'processed_rows',
+        'skipped_count',
+        'skipped_rows',
         'error_message',
+    ];
+
+    protected $casts = [
+        'skipped_rows' => 'array',
     ];
 
     public function school()

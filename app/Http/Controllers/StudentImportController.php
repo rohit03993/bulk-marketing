@@ -8,6 +8,7 @@ use App\Models\School;
 use App\Models\Student;
 use App\Models\StudentImport;
 use App\Models\StudentImportColumn;
+use App\Models\Tag;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use PhpOffice\PhpSpreadsheet\IOFactory;
@@ -36,6 +37,7 @@ class StudentImportController extends Controller
         $valid = $request->validate([
             'school_id' => 'required|exists:schools,id',
             'academic_session_id' => 'nullable|exists:academic_sessions,id',
+            'tag_name' => 'nullable|string|max:100',
             'import_class' => 'nullable|string|in:1,2,3,4,5,6,7,8,9,10,11,12,custom',
             'import_class_custom' => 'nullable|string|max:100',
             'import_section_name' => 'nullable|string|max:50',
@@ -56,6 +58,7 @@ class StudentImportController extends Controller
             'academic_session_id' => $valid['academic_session_id'] ?? null,
             'import_class_name' => $importClassName,
             'import_section_name' => $importSectionName,
+            'tag_name' => $valid['tag_name'] ?? null,
             'original_filename' => $file->getClientOriginalName(),
             'status' => 'mapping',
             'total_rows' => 0,
@@ -164,12 +167,20 @@ class StudentImportController extends Controller
         }
 
         $processed = 0;
-        $skipped = 0;
-        $overwritten = 0;
-        $errors = [];
+        $existingTagged = 0;
+        $skippedRows = [];
         $policy = $studentImport->duplicate_phone_policy ?? 'skip';
 
+        $tag = null;
+        if ($studentImport->tag_name) {
+            $tag = Tag::firstOrCreate(
+                ['name' => $studentImport->tag_name],
+                ['type' => 'student_import']
+            );
+        }
+
         for ($i = 1; $i < count($rows); $i++) {
+            $rowNum = $i + 1;
             $row = $rows[$i];
             $data = [];
             foreach ($mappings as $index => $map) {
@@ -180,7 +191,12 @@ class StudentImportController extends Controller
             }
 
             if (empty($data['name'])) {
-                $errors[] = "Row ".($i + 1).": missing name";
+                $skippedRows[] = [
+                    'row' => $rowNum,
+                    'reason' => __('Missing student name'),
+                    'name' => null,
+                    'phone' => isset($data['whatsapp_phone_primary']) ? $data['whatsapp_phone_primary'] : null,
+                ];
                 continue;
             }
 
@@ -190,11 +206,21 @@ class StudentImportController extends Controller
             $secondaryNormalized = $rawSecondary ? Student::normalizeIndianPhone($rawSecondary) : null;
 
             if ($rawPrimary && $primaryNormalized === null) {
-                $errors[] = "Row ".($i + 1).": invalid Indian phone (".$rawPrimary."). Use 10 digits or +91.";
+                $skippedRows[] = [
+                    'row' => $rowNum,
+                    'reason' => __('Invalid primary phone (use 10 digits or +91)'),
+                    'name' => $data['name'] ?? null,
+                    'phone' => $rawPrimary,
+                ];
                 continue;
             }
             if ($rawSecondary && $secondaryNormalized === null) {
-                $errors[] = "Row ".($i + 1).": invalid secondary phone.";
+                $skippedRows[] = [
+                    'row' => $rowNum,
+                    'reason' => __('Invalid secondary phone'),
+                    'name' => $data['name'] ?? null,
+                    'phone' => $rawSecondary,
+                ];
                 continue;
             }
 
@@ -204,32 +230,23 @@ class StudentImportController extends Controller
             $existingByPhone = $primaryNormalized ? Student::findByPhone($primaryNormalized) : null;
 
             if ($existingByPhone) {
-                if ($policy === 'skip') {
-                    $skipped++;
-                    continue;
-                }
                 $student = $existingByPhone;
-                $classSection = ClassSection::firstOrCreate(
-                    [
-                        'school_id' => $schoolId,
-                        'academic_session_id' => $sessionId,
-                        'class_name' => $className,
-                        'section_name' => $sectionName,
-                    ],
-                    []
-                );
-                $payload = [
-                    'class_section_id' => $classSection->id,
-                    'name' => $data['name'],
-                    'father_name' => $data['father_name'] ?? null,
-                    'roll_number' => $data['roll_number'] ?? null,
-                    'admission_number' => $data['admission_number'] ?? null,
-                    'whatsapp_phone_primary' => $primaryNormalized,
-                    'whatsapp_phone_secondary' => $secondaryNormalized,
-                    'status' => 'active',
-                ];
-                $student->update($payload);
-                $overwritten++;
+
+                // Do NOT move the student between entities/classes or create duplicates.
+                // Optionally update missing secondary phone, but keep existing class_section_id and details.
+                $changes = [];
+                if ($secondaryNormalized && ! $student->whatsapp_phone_secondary) {
+                    $changes['whatsapp_phone_secondary'] = $secondaryNormalized;
+                }
+                if (! empty($changes)) {
+                    $student->update($changes);
+                }
+
+                if ($tag) {
+                    $student->tags()->syncWithoutDetaching([$tag->id]);
+                }
+
+                $existingTagged++;
                 $processed++;
                 continue;
             }
@@ -254,25 +271,48 @@ class StudentImportController extends Controller
                 'status' => 'active',
             ];
 
-            Student::create(array_merge($payload, ['class_section_id' => $classSection->id]));
+            $student = Student::create(array_merge($payload, ['class_section_id' => $classSection->id]));
+
+            if ($tag) {
+                $student->tags()->syncWithoutDetaching([$tag->id]);
+            }
+
             $processed++;
         }
 
         $studentImport->update([
             'status' => 'completed',
             'processed_rows' => $processed,
-            'error_message' => empty($errors) ? null : implode("\n", array_slice($errors, 0, 20)),
+            'skipped_count' => count($skippedRows),
+            'skipped_rows' => $skippedRows,
+            'error_message' => null,
         ]);
 
-        $message = __('Import completed. :count processed.', ['count' => $processed]);
-        if ($skipped > 0) {
-            $message .= ' '.__(':skipped rows skipped (duplicate phone).', ['skipped' => $skipped]);
+        $total = count($rows) - 1;
+        $skipped = count($skippedRows);
+        $message = __('Import completed. :processed of :total rows imported successfully.', [
+            'processed' => $processed,
+            'total' => $total,
+        ]);
+        if ($existingTagged > 0) {
+            $message .= ' '.__(':count existing student(s) matched by phone and tagged (no duplicate created).', ['count' => $existingTagged]);
         }
-        if ($overwritten > 0) {
-            $message .= ' '.__(':overwritten existing records updated.', ['overwritten' => $overwritten]);
+        if ($skipped > 0) {
+            $message .= ' '.__(':count row(s) could not be imported.', ['count' => $skipped]);
         }
 
         return redirect()->route('student-imports.index')
-            ->with('success', $message);
+            ->with('success', $message)
+            ->with('import_id_with_skipped', $skipped > 0 ? $studentImport->id : null);
+    }
+
+    /**
+     * Show import report: summary and list of skipped rows (ignored numbers) with reasons.
+     */
+    public function report(StudentImport $studentImport)
+    {
+        return view('crm.student-imports.report', [
+            'import' => $studentImport->load('school'),
+        ]);
     }
 }

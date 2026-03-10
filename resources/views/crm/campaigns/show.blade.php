@@ -52,6 +52,12 @@
                 </div>
             </div>
 
+            @if ($campaign->shot_at && $campaign->shotByUser)
+                <div class="bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm text-slate-700">
+                    {{ __('Shot by') }} <strong>{{ $campaign->shotByUser->name }}</strong> {{ __('on') }} {{ $campaign->shot_at->format('d M Y, h:i A') }}
+                </div>
+            @endif
+
             @if ($pendingCount > 0)
                 <div id="campaign-progress-section" class="space-y-4">
                     <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm text-blue-800">

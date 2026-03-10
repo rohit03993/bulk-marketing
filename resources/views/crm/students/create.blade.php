@@ -59,6 +59,18 @@
                             <option value="inactive" {{ old('status') === 'inactive' ? 'selected' : '' }}>{{ __('Inactive') }}</option>
                         </select>
                     </div>
+                    <div>
+                        <x-input-label for="lead_status" :value="__('Lead status')" />
+                        <select id="lead_status" name="lead_status" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                            <option value="lead" {{ old('lead_status', 'lead') === 'lead' ? 'selected' : '' }}>{{ __('Lead') }}</option>
+                            <option value="interested" {{ old('lead_status') === 'interested' ? 'selected' : '' }}>{{ __('Interested') }}</option>
+                            <option value="not_interested" {{ old('lead_status') === 'not_interested' ? 'selected' : '' }}>{{ __('Not Interested') }}</option>
+                            <option value="walkin_done" {{ old('lead_status') === 'walkin_done' ? 'selected' : '' }}>{{ __('Walk-in Done') }}</option>
+                            <option value="admission_done" {{ old('lead_status') === 'admission_done' ? 'selected' : '' }}>{{ __('Admission Done') }}</option>
+                            <option value="follow_up_later" {{ old('lead_status') === 'follow_up_later' ? 'selected' : '' }}>{{ __('Follow-up Later') }}</option>
+                        </select>
+                        <x-input-error :messages="$errors->get('lead_status')" class="mt-1" />
+                    </div>
                     <div class="flex gap-3 pt-2">
                         <x-primary-button>{{ __('Add Student') }}</x-primary-button>
                         <a href="{{ route('students.index') }}" class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">{{ __('Cancel') }}</a>

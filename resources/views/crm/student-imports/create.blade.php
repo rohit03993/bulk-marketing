@@ -62,6 +62,15 @@
                         </div>
                     </div>
                     <div>
+                        <x-input-label for="tag_name" :value="__('Tag / list name (optional)')" />
+                        <p class="text-xs text-gray-500 mt-0.5">
+                            {{ __('All imported students will be tagged with this name, e.g. "DPS School", "Interested Candidates", "Walk-in Campaign".') }}
+                        </p>
+                        <input type="text" id="tag_name" name="tag_name" value="{{ old('tag_name') }}" placeholder="e.g. DPS School, Interested Candidates"
+                               class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                        <x-input-error :messages="$errors->get('tag_name')" class="mt-1" />
+                    </div>
+                    <div>
                         <x-input-label for="file" :value="__('Excel file')" />
                         <input type="file" id="file" name="file" accept=".xlsx,.xls,.csv" required
                                class="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100">

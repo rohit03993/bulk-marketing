@@ -22,6 +22,11 @@ class User extends Authenticatable
         'email',
         'password',
         'is_admin',
+        'created_by',
+        'can_access_schools',
+        'can_access_students',
+        'can_access_campaigns',
+        'can_access_templates',
     ];
 
     protected function casts(): array
@@ -30,6 +35,10 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'is_admin' => 'boolean',
+            'can_access_schools' => 'boolean',
+            'can_access_students' => 'boolean',
+            'can_access_campaigns' => 'boolean',
+            'can_access_templates' => 'boolean',
         ];
     }
 
@@ -46,5 +55,15 @@ class User extends Authenticatable
     public function isAdmin(): bool
     {
         return (bool) $this->is_admin;
+    }
+
+    public function createdBy()
+    {
+        return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function createdStaff()
+    {
+        return $this->hasMany(User::class, 'created_by');
     }
 }

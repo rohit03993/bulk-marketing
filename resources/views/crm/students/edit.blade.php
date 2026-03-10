@@ -58,6 +58,35 @@
                             <option value="inactive" {{ old('status', $student->status) === 'inactive' ? 'selected' : '' }}>{{ __('Inactive') }}</option>
                         </select>
                     </div>
+                    <div>
+                        <x-input-label for="lead_status" :value="__('Lead status')" />
+                        <select id="lead_status" name="lead_status" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                            @php
+                                $currentLeadStatus = old('lead_status', $student->lead_status ?? 'lead');
+                            @endphp
+                            <option value="lead" {{ $currentLeadStatus === 'lead' ? 'selected' : '' }}>{{ __('Lead') }}</option>
+                            <option value="interested" {{ $currentLeadStatus === 'interested' ? 'selected' : '' }}>{{ __('Interested') }}</option>
+                            <option value="not_interested" {{ $currentLeadStatus === 'not_interested' ? 'selected' : '' }}>{{ __('Not Interested') }}</option>
+                            <option value="walkin_done" {{ $currentLeadStatus === 'walkin_done' ? 'selected' : '' }}>{{ __('Walk-in Done') }}</option>
+                            <option value="admission_done" {{ $currentLeadStatus === 'admission_done' ? 'selected' : '' }}>{{ __('Admission Done') }}</option>
+                            <option value="follow_up_later" {{ $currentLeadStatus === 'follow_up_later' ? 'selected' : '' }}>{{ __('Follow-up Later') }}</option>
+                        </select>
+                        <x-input-error :messages="$errors->get('lead_status')" class="mt-1" />
+                    </div>
+                    @if (!empty($assignableUsers) && Auth::user()->isAdmin())
+                        <div>
+                            <x-input-label for="assigned_to" :value="__('Assigned telecaller')" />
+                            <select id="assigned_to" name="assigned_to" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                <option value="">{{ __('Unassigned') }}</option>
+                                @foreach ($assignableUsers as $u)
+                                    <option value="{{ $u->id }}" {{ (int) old('assigned_to', $student->assigned_to) === $u->id ? 'selected' : '' }}>
+                                        {{ $u->name }}
+                                    </option>
+                                @endforeach
+                            </select>
+                            <p class="text-xs text-gray-500 mt-1">{{ __('Only admins can change assignment. Telecaller will see this student in My Leads.') }}</p>
+                        </div>
+                    @endif
                     <div class="flex gap-3 pt-2">
                         <x-primary-button>{{ __('Update Student') }}</x-primary-button>
                         <a href="{{ route('students.index') }}" class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">{{ __('Cancel') }}</a>

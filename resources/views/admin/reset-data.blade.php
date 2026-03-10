@@ -12,8 +12,10 @@
         <div class="max-w-xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="bg-white rounded-2xl border border-red-200 shadow-sm overflow-hidden">
                 <div class="px-6 py-4 bg-red-50 border-b border-red-100">
-                    <p class="font-medium text-red-800">{{ __('This will permanently delete all CRM data.') }}</p>
-                    <p class="mt-1 text-sm text-red-700">{{ __('User accounts and settings (e.g. Aisensy API) are kept.') }}</p>
+                    <p class="font-medium text-red-800">{{ __('This will permanently delete almost all CRM data.') }}</p>
+                    <p class="mt-1 text-sm text-red-700">
+                        {{ __('Only admin logins and system settings (e.g. Aisensy API) will be kept. All staff logins and operational data will be removed.') }}
+                    </p>
                 </div>
                 <div class="px-6 py-4 space-y-4">
                     <p class="text-sm text-slate-600">{{ __('The following will be deleted:') }}</p>
@@ -25,6 +27,9 @@
                         <li>{{ __('Templates') }} ({{ number_format($counts['templates']) }})</li>
                         <li>{{ __('Campaigns') }} ({{ number_format($counts['campaigns']) }})</li>
                         <li>{{ __('Student imports') }} ({{ number_format($counts['imports']) }})</li>
+                        <li>{{ __('Lead / call history') }} ({{ number_format($counts['student_calls']) }})</li>
+                        <li>{{ __('Tags & lists') }} ({{ number_format($counts['tags']) }})</li>
+                        <li>{{ __('Staff user accounts') }} ({{ number_format($counts['staff_users']) }})</li>
                     </ul>
 
                     <form method="POST" action="{{ route('admin.reset-data.perform') }}" class="space-y-4 pt-2">

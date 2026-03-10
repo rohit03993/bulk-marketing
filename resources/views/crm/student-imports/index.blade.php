@@ -12,7 +12,16 @@
     <div class="py-6">
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
             @if (session('success'))
-                <div class="mb-4 rounded-md bg-green-50 p-4 text-sm text-green-800">{{ session('success') }}</div>
+                <div class="mb-4 rounded-lg border border-green-200 bg-green-50 p-4">
+                    <p class="text-sm font-medium text-green-800">{{ session('success') }}</p>
+                    @if (session('import_id_with_skipped'))
+                        <a href="{{ route('student-imports.report', session('import_id_with_skipped')) }}"
+                           class="inline-flex items-center gap-1 mt-2 text-sm font-medium text-green-700 hover:text-green-900">
+                            {{ __('View skipped rows and reasons') }}
+                            <span aria-hidden="true">→</span>
+                        </a>
+                    @endif
+                </div>
             @endif
             @if (session('error'))
                 <div class="mb-4 rounded-md bg-red-50 p-4 text-sm text-red-800">{{ session('error') }}</div>
@@ -34,6 +43,7 @@
                                     <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{{ __('Rows') }}</th>
                                     <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{{ __('Status') }}</th>
                                     <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{{ __('Date') }}</th>
+                                    <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">{{ __('Actions') }}</th>
                                 </tr>
                             </thead>
                             <tbody class="bg-white divide-y divide-gray-200">
@@ -41,7 +51,14 @@
                                     <tr class="hover:bg-gray-50">
                                         <td class="px-4 py-3 text-sm font-medium text-gray-900">{{ $imp->original_filename }}</td>
                                         <td class="px-4 py-3 text-sm text-gray-600">{{ $imp->school->name }}</td>
-                                        <td class="px-4 py-3 text-sm">{{ $imp->processed_rows }} / {{ $imp->total_rows }}</td>
+                                        <td class="px-4 py-3 text-sm">
+                                            <span class="text-gray-900">{{ $imp->processed_rows }}</span>
+                                            <span class="text-gray-400">/</span>
+                                            <span class="text-gray-700">{{ $imp->total_rows }}</span>
+                                            @if ($imp->skipped_count > 0)
+                                                <span class="ml-1 text-amber-600 text-xs" title="{{ __('Skipped') }}">({{ $imp->skipped_count }} {{ __('skipped') }})</span>
+                                            @endif
+                                        </td>
                                         <td class="px-4 py-3">
                                             @if ($imp->status === 'completed')
                                                 <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">{{ __('Completed') }}</span>
@@ -54,6 +71,16 @@
                                             @endif
                                         </td>
                                         <td class="px-4 py-3 text-sm text-gray-500">{{ $imp->created_at->format('M j, Y H:i') }}</td>
+                                        <td class="px-4 py-3 text-right">
+                                            @if ($imp->status === 'completed')
+                                                <a href="{{ route('student-imports.report', $imp) }}"
+                                                   class="text-indigo-600 hover:text-indigo-800 text-sm font-medium">
+                                                    {{ $imp->skipped_count > 0 ? __('View report') : __('Summary') }}
+                                                </a>
+                                            @else
+                                                <span class="text-gray-400">—</span>
+                                            @endif
+                                        </td>
                                     </tr>
                                 @endforeach
                             </tbody>

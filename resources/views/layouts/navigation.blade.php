@@ -13,12 +13,25 @@
 
                 <div class="hidden sm:flex sm:items-center sm:gap-1 sm:ml-8">
                     <x-nav-link :href="route('dashboard')" :active="request()->routeIs('dashboard')">{{ __('Dashboard') }}</x-nav-link>
-                    <x-nav-link :href="route('schools.index')" :active="request()->routeIs('schools.*')">{{ __('Schools') }}</x-nav-link>
-                    <x-nav-link :href="route('students.index')" :active="request()->routeIs('students.*')">{{ __('Students') }}</x-nav-link>
-                    <x-nav-link :href="route('campaigns.index')" :active="request()->routeIs('campaigns.*')">{{ __('Campaigns') }}</x-nav-link>
-                    <x-nav-link :href="route('templates.index')" :active="request()->routeIs('templates.*')">{{ __('Templates') }}</x-nav-link>
+                    @if (Auth::user()->isAdmin() || Auth::user()->can_access_schools)
+                        <x-nav-link :href="route('schools.index')" :active="request()->routeIs('schools.*')">{{ __('Schools') }}</x-nav-link>
+                        <x-nav-link :href="route('students.index')" :active="request()->routeIs('students.index')">{{ __('Students') }}</x-nav-link>
+                    @endif
+                    @unless (Auth::user()->isAdmin())
+                        {{-- Telecaller: My leads, Start Calling, Follow-ups (not shown to admins) --}}
+                        <x-nav-link :href="route('students.my-leads')" :active="request()->routeIs('students.my-leads')">{{ __('My Leads') }}</x-nav-link>
+                        <x-nav-link :href="route('students.call-queue')" :active="request()->routeIs('students.call-queue*')">{{ __('Start Calling') }}</x-nav-link>
+                        <x-nav-link :href="route('students.followups')" :active="request()->routeIs('students.followups')">{{ __('Follow-ups') }}</x-nav-link>
+                    @endunless
+                    @if (Auth::user()->isAdmin() || Auth::user()->can_access_campaigns)
+                        <x-nav-link :href="route('campaigns.index')" :active="request()->routeIs('campaigns.*')">{{ __('Campaigns') }}</x-nav-link>
+                    @endif
+                    @if (Auth::user()->isAdmin() || Auth::user()->can_access_templates)
+                        <x-nav-link :href="route('templates.index')" :active="request()->routeIs('templates.*')">{{ __('Templates') }}</x-nav-link>
+                    @endif
                     @if (Auth::user()->isAdmin())
                         <x-nav-link :href="route('admin.dashboard')" :active="request()->routeIs('admin.*')">{{ __('Admin') }}</x-nav-link>
+                        <x-nav-link :href="route('admin.staff.index')" :active="request()->routeIs('admin.staff.*')">{{ __('Staff') }}</x-nav-link>
                     @endif
                 </div>
             </div>
@@ -61,7 +74,12 @@
         <div class="pt-3 pb-3 space-y-0.5 px-3">
             <x-responsive-nav-link :href="route('dashboard')" :active="request()->routeIs('dashboard')">{{ __('Dashboard') }}</x-responsive-nav-link>
             <x-responsive-nav-link :href="route('schools.index')" :active="request()->routeIs('schools.*')">{{ __('Schools') }}</x-responsive-nav-link>
-            <x-responsive-nav-link :href="route('students.index')" :active="request()->routeIs('students.*')">{{ __('Students') }}</x-responsive-nav-link>
+            <x-responsive-nav-link :href="route('students.index')" :active="request()->routeIs('students.index')">{{ __('Students') }}</x-responsive-nav-link>
+            @unless (Auth::user()->isAdmin())
+                <x-responsive-nav-link :href="route('students.my-leads')" :active="request()->routeIs('students.my-leads')">{{ __('My Leads') }}</x-responsive-nav-link>
+                <x-responsive-nav-link :href="route('students.call-queue')" :active="request()->routeIs('students.call-queue*')">{{ __('Start Calling') }}</x-responsive-nav-link>
+                <x-responsive-nav-link :href="route('students.followups')" :active="request()->routeIs('students.followups')">{{ __('Follow-ups') }}</x-responsive-nav-link>
+            @endunless
             <x-responsive-nav-link :href="route('campaigns.index')" :active="request()->routeIs('campaigns.*')">{{ __('Campaigns') }}</x-responsive-nav-link>
             <x-responsive-nav-link :href="route('templates.index')" :active="request()->routeIs('templates.*')">{{ __('Templates') }}</x-responsive-nav-link>
             @if (Auth::user()->isAdmin())

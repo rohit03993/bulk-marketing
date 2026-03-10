@@ -20,11 +20,23 @@ class Student extends Model
         'whatsapp_phone_primary',
         'whatsapp_phone_secondary',
         'status',
+        'lead_status',
+        'assigned_to',
+        'assigned_by',
+        'assigned_at',
+        'total_calls',
+        'last_call_at',
+        'last_call_status',
+        'last_call_notes',
+        'next_followup_at',
         'meta',
     ];
 
     protected $casts = [
         'meta' => 'array',
+        'assigned_at' => 'datetime',
+        'last_call_at' => 'datetime',
+        'next_followup_at' => 'datetime',
     ];
 
     public function classSection()
@@ -40,6 +52,26 @@ class Student extends Model
     public function academicSession()
     {
         return $this->classSection?->academicSession();
+    }
+
+    public function tags()
+    {
+        return $this->belongsToMany(Tag::class)->withTimestamps();
+    }
+
+    public function calls()
+    {
+        return $this->hasMany(StudentCall::class);
+    }
+
+    public function assignedTo()
+    {
+        return $this->belongsTo(User::class, 'assigned_to');
+    }
+
+    public function assignedBy()
+    {
+        return $this->belongsTo(User::class, 'assigned_by');
     }
 
     public function getWhatsappPhones(): array
