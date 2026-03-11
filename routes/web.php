@@ -108,15 +108,21 @@ Route::middleware(['auth', 'verified'])->group(function () {
         $upcomingDays = 14;
         $upcomingUntil = $endOfToday->copy()->addDays($upcomingDays);
 
+        $myLeadsQuery = \App\Models\Student::where('assigned_to', $userId);
         $stats = [
-            'assigned_leads' => \App\Models\Student::where('assigned_to', $userId)->count(),
-            // All open follow-ups where next_followup_at is set up to 14 days from today (includes overdue + today + upcoming)
-            'followups_window' => \App\Models\Student::where('assigned_to', $userId)
+            'assigned_leads' => (clone $myLeadsQuery)->count(),
+            'lead_new' => (clone $myLeadsQuery)->where('lead_status', 'lead')->count(),
+            'lead_interested' => (clone $myLeadsQuery)->where('lead_status', 'interested')->count(),
+            'lead_followup_later' => (clone $myLeadsQuery)->where('lead_status', 'follow_up_later')->count(),
+            'lead_walkin_done' => (clone $myLeadsQuery)->where('lead_status', 'walkin_done')->count(),
+            'lead_admission_done' => (clone $myLeadsQuery)->where('lead_status', 'admission_done')->count(),
+            'lead_not_interested' => (clone $myLeadsQuery)->where('lead_status', 'not_interested')->count(),
+            'not_called' => (clone $myLeadsQuery)->where('total_calls', 0)->count(),
+            'followups_window' => (clone $myLeadsQuery)
                 ->whereNotNull('next_followup_at')
                 ->where('next_followup_at', '<=', $upcomingUntil)
                 ->count(),
-            // Strictly overdue (before today)
-            'overdue_followups' => \App\Models\Student::where('assigned_to', $userId)
+            'overdue_followups' => (clone $myLeadsQuery)
                 ->whereNotNull('next_followup_at')
                 ->whereDate('next_followup_at', '<', $today)
                 ->count(),

@@ -72,18 +72,26 @@
 
     <div :class="{'block': open, 'hidden': !open}" class="sm:hidden border-t border-slate-700/50">
         <div class="pt-3 pb-3 space-y-0.5 px-3">
-            <x-responsive-nav-link :href="route('dashboard')" :active="request()->routeIs('dashboard')">{{ __('Dashboard') }}</x-responsive-nav-link>
-            <x-responsive-nav-link :href="route('schools.index')" :active="request()->routeIs('schools.*')">{{ __('Schools') }}</x-responsive-nav-link>
-            <x-responsive-nav-link :href="route('students.index')" :active="request()->routeIs('students.index')">{{ __('Students') }}</x-responsive-nav-link>
-            @unless (Auth::user()->isAdmin())
-                <x-responsive-nav-link :href="route('students.my-leads')" :active="request()->routeIs('students.my-leads')">{{ __('My Leads') }}</x-responsive-nav-link>
-                <x-responsive-nav-link :href="route('students.call-queue')" :active="request()->routeIs('students.call-queue*')">{{ __('Start Calling') }}</x-responsive-nav-link>
-                <x-responsive-nav-link :href="route('students.followups')" :active="request()->routeIs('students.followups')">{{ __('Follow-ups') }}</x-responsive-nav-link>
-            @endunless
-            <x-responsive-nav-link :href="route('campaigns.index')" :active="request()->routeIs('campaigns.*')">{{ __('Campaigns') }}</x-responsive-nav-link>
-            <x-responsive-nav-link :href="route('templates.index')" :active="request()->routeIs('templates.*')">{{ __('Templates') }}</x-responsive-nav-link>
             @if (Auth::user()->isAdmin())
+                <x-responsive-nav-link :href="route('dashboard')" :active="request()->routeIs('dashboard')">{{ __('Dashboard') }}</x-responsive-nav-link>
+                <x-responsive-nav-link :href="route('schools.index')" :active="request()->routeIs('schools.*')">{{ __('Schools') }}</x-responsive-nav-link>
+                <x-responsive-nav-link :href="route('students.index')" :active="request()->routeIs('students.index')">{{ __('Students') }}</x-responsive-nav-link>
+                <x-responsive-nav-link :href="route('campaigns.index')" :active="request()->routeIs('campaigns.*')">{{ __('Campaigns') }}</x-responsive-nav-link>
+                <x-responsive-nav-link :href="route('templates.index')" :active="request()->routeIs('templates.*')">{{ __('Templates') }}</x-responsive-nav-link>
                 <x-responsive-nav-link :href="route('admin.dashboard')" :active="request()->routeIs('admin.*')">{{ __('Admin') }}</x-responsive-nav-link>
+                <x-responsive-nav-link :href="route('admin.staff.index')" :active="request()->routeIs('admin.staff.*')">{{ __('Staff') }}</x-responsive-nav-link>
+            @else
+                {{-- Telecaller: minimal items since bottom nav covers primary links --}}
+                @if (Auth::user()->can_access_schools)
+                    <x-responsive-nav-link :href="route('schools.index')" :active="request()->routeIs('schools.*')">{{ __('Schools') }}</x-responsive-nav-link>
+                    <x-responsive-nav-link :href="route('students.index')" :active="request()->routeIs('students.index')">{{ __('All Students') }}</x-responsive-nav-link>
+                @endif
+                @if (Auth::user()->can_access_campaigns)
+                    <x-responsive-nav-link :href="route('campaigns.index')" :active="request()->routeIs('campaigns.*')">{{ __('Campaigns') }}</x-responsive-nav-link>
+                @endif
+                @if (Auth::user()->can_access_templates)
+                    <x-responsive-nav-link :href="route('templates.index')" :active="request()->routeIs('templates.*')">{{ __('Templates') }}</x-responsive-nav-link>
+                @endif
             @endif
         </div>
         <div class="pt-3 pb-3 border-t border-slate-700/50 px-4">

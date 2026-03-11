@@ -33,6 +33,8 @@
             <main class="pb-12 bg-slate-100 min-h-[50vh]">
                 {{ $slot }}
             </main>
+
+            @include('layouts.bottom-nav')
         </div>
     </body>
 </html>

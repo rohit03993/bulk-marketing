@@ -1,9 +1,11 @@
 <x-app-layout>
+    @if (auth()->user()->isAdmin())
     <x-slot name="header">
         <h2 class="font-semibold text-xl text-slate-800 leading-tight">
             {{ __('Dashboard') }}
         </h2>
     </x-slot>
+    @endif
 
     @php
         $stats = $stats ?? [];
@@ -105,34 +107,68 @@
                     </div>
                 </div>
             @else
-                {{-- Telecaller personal dashboard --}}
-                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-                    <a href="{{ route('students.my-leads') }}" class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 hover:border-indigo-300 hover:shadow-md transition">
-                        <p class="text-sm font-medium text-slate-500">{{ __('My leads assigned') }}</p>
-                        <p class="mt-2 text-3xl font-bold text-slate-800">{{ $stats['assigned_leads'] ?? 0 }}</p>
+                {{-- Telecaller personal dashboard (app-style) --}}
+
+                {{-- Hero banner --}}
+                <div class="rounded-2xl bg-gradient-to-r from-indigo-600 via-violet-600 to-purple-600 p-5 sm:p-6 text-white shadow-lg -mt-2">
+                    <div class="flex items-center gap-3">
+                        <span class="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center text-lg font-bold">
+                            {{ strtoupper(substr(auth()->user()->name, 0, 1)) }}
+                        </span>
+                        <div>
+                            <h2 class="text-lg font-bold leading-tight">{{ __('My Dashboard') }}</h2>
+                            <p class="text-sm text-indigo-100">{{ __('Track your leads and calls') }}</p>
+                        </div>
+                    </div>
+                </div>
+
+                {{-- Lead status cards --}}
+                @php
+                    $cards = [
+                        ['label' => __('Total Leads'), 'value' => $stats['assigned_leads'] ?? 0, 'href' => route('students.my-leads'), 'bg' => 'bg-indigo-100', 'text' => 'text-indigo-700', 'icon' => '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/>'],
+                        ['label' => __('New Leads'), 'value' => $stats['lead_new'] ?? 0, 'href' => route('students.my-leads', ['status' => 'lead']), 'bg' => 'bg-emerald-100', 'text' => 'text-emerald-700', 'icon' => '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/>'],
+                        ['label' => __('Follow-up'), 'value' => $stats['followups_window'] ?? 0, 'href' => route('students.followups'), 'bg' => 'bg-amber-100', 'text' => 'text-amber-700', 'icon' => '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>'],
+                        ['label' => __('Converted'), 'value' => $stats['lead_admission_done'] ?? 0, 'href' => route('students.my-leads', ['status' => 'admission_done']), 'bg' => 'bg-green-100', 'text' => 'text-green-700', 'icon' => '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>'],
+                        ['label' => __('Calls Today'), 'value' => $stats['calls_today'] ?? 0, 'href' => route('calls.report'), 'bg' => 'bg-teal-100', 'text' => 'text-teal-700', 'icon' => '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/>'],
+                        ['label' => __('Interested'), 'value' => $stats['lead_interested'] ?? 0, 'href' => route('students.my-leads', ['status' => 'interested']), 'bg' => 'bg-pink-100', 'text' => 'text-pink-700', 'icon' => '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/>'],
+                        ['label' => __('Walk-in Done'), 'value' => $stats['lead_walkin_done'] ?? 0, 'href' => route('students.my-leads', ['status' => 'walkin_done']), 'bg' => 'bg-cyan-100', 'text' => 'text-cyan-700', 'icon' => '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/>'],
+                        ['label' => __('Not Called'), 'value' => $stats['not_called'] ?? 0, 'href' => route('students.my-leads'), 'bg' => 'bg-rose-100', 'text' => 'text-rose-700', 'icon' => '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>'],
+                    ];
+                @endphp
+
+                <div class="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+                    @foreach ($cards as $card)
+                        <a href="{{ $card['href'] }}" class="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 flex items-start justify-between hover:shadow-md hover:border-indigo-200 transition group">
+                            <div>
+                                <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide">{{ $card['label'] }}</p>
+                                <p class="mt-2 text-2xl sm:text-3xl font-extrabold {{ $card['text'] }}">{{ $card['value'] }}</p>
+                            </div>
+                            <span class="w-10 h-10 rounded-xl {{ $card['bg'] }} flex items-center justify-center shrink-0 group-hover:scale-110 transition">
+                                <svg class="w-5 h-5 {{ $card['text'] }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">{!! $card['icon'] !!}</svg>
+                            </span>
+                        </a>
+                    @endforeach
+                </div>
+
+                {{-- Quick actions --}}
+                <div class="flex flex-wrap gap-3 mt-1">
+                    <a href="{{ route('students.call-queue') }}" class="flex-1 min-w-[140px] flex items-center gap-3 bg-indigo-600 text-white rounded-2xl px-5 py-4 shadow-md hover:bg-indigo-700 transition">
+                        <svg class="w-6 h-6 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
+                        <div>
+                            <p class="text-sm font-bold">{{ __('Start Calling') }}</p>
+                            <p class="text-xs text-indigo-200">{{ __('Open call queue') }}</p>
+                        </div>
                     </a>
-                    <a href="{{ route('students.followups') }}" class="bg-white rounded-2xl border border-emerald-200 shadow-sm p-6 hover:border-emerald-300 hover:shadow-md transition">
-                        <p class="text-sm font-medium text-slate-500">{{ __('Open follow-ups (0–14 days)') }}</p>
-                        <p class="mt-2 text-3xl font-bold text-emerald-700">{{ $stats['followups_window'] ?? 0 }}</p>
-                    </a>
-                    <a href="{{ route('students.followups') }}" class="bg-white rounded-2xl border border-amber-200 shadow-sm p-6 hover:border-amber-300 hover:shadow-md transition">
-                        <p class="text-sm font-medium text-slate-500">{{ __('Overdue follow-ups') }}</p>
-                        <p class="mt-2 text-3xl font-bold text-amber-700">{{ $stats['overdue_followups'] ?? 0 }}</p>
-                    </a>
-                    <a href="{{ route('calls.report') }}" class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 hover:border-slate-300 hover:shadow-md transition">
-                        <p class="text-sm font-medium text-slate-500">{{ __('Calls today') }}</p>
-                        <p class="mt-2 text-3xl font-bold text-slate-800">{{ $stats['calls_today'] ?? 0 }}</p>
-                        <p class="mt-1 text-xs text-slate-500">
-                            {{ __('Not connected today:') }}
-                            <span class="font-semibold text-rose-600">{{ $stats['not_connected_today'] ?? 0 }}</span>
-                            <span class="mx-1">·</span>
-                            {{ __('Messages sent from my campaigns:') }}
-                            <span class="font-semibold text-emerald-600">{{ $stats['messages_sent'] ?? 0 }}</span>
-                        </p>
+                    <a href="{{ route('students.my-leads') }}" class="flex-1 min-w-[140px] flex items-center gap-3 bg-white text-slate-700 rounded-2xl px-5 py-4 shadow-sm border border-slate-200 hover:border-indigo-300 hover:shadow-md transition">
+                        <svg class="w-6 h-6 shrink-0 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                        <div>
+                            <p class="text-sm font-bold">{{ __('View All Leads') }}</p>
+                            <p class="text-xs text-slate-400">{{ __('Browse assigned leads') }}</p>
+                        </div>
                     </a>
                 </div>
 
-                {{-- Telecaller rating --}}
+                {{-- Telecaller score --}}
                 @php
                     $scoreToday   = $stats['score_today'] ?? null;
                     $scoreOverall = $stats['score_overall'] ?? null;
@@ -144,41 +180,60 @@
                             default => __('Needs focus'),
                         };
                     };
+                    $colorFor = function ($pct) {
+                        return match (true) {
+                            $pct >= 85 => 'text-emerald-600',
+                            $pct >= 70 => 'text-blue-600',
+                            $pct >= 40 => 'text-amber-600',
+                            default => 'text-rose-600',
+                        };
+                    };
                 @endphp
 
                 @if ($scoreToday)
-                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-5 mt-8">
-                        <div class="bg-white rounded-2xl border border-indigo-200 shadow-sm p-6">
-                            <p class="text-sm font-medium text-slate-500">{{ __('My score (today)') }}</p>
-                            <div class="mt-2 flex items-baseline gap-2">
-                                <p class="text-4xl font-extrabold text-indigo-700">{{ $scoreToday['score'] ?? 0 }}%</p>
-                            </div>
-                            <p class="mt-1 text-xs font-semibold text-slate-600">{{ $labelFor($scoreToday['score'] ?? 0) }}</p>
-                            <p class="mt-2 text-xs text-slate-500">
-                                {{ __('Calls:') }}
-                                <span class="font-semibold text-slate-800">
-                                    {{ $scoreToday['breakdown']['total_calls'] ?? 0 }}/{{ $scoreToday['breakdown']['daily_target'] ?? 25 }}
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-5">
+                            <div class="flex items-center justify-between">
+                                <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide">{{ __('My Score Today') }}</p>
+                                <span class="text-[10px] font-bold px-2 py-0.5 rounded-full {{ ($scoreToday['score'] ?? 0) >= 70 ? 'bg-emerald-100 text-emerald-700' : (($scoreToday['score'] ?? 0) >= 40 ? 'bg-amber-100 text-amber-700' : 'bg-rose-100 text-rose-700') }}">
+                                    {{ $labelFor($scoreToday['score'] ?? 0) }}
                                 </span>
-                                <span class="mx-1">·</span>
-                                {{ __('Connected rate:') }}
-                                <span class="font-semibold text-slate-800">{{ $scoreToday['breakdown']['connected_rate'] ?? 0 }}%</span>
-                                <span class="mx-1">·</span>
-                                {{ __('Follow-up compliance:') }}
-                                <span class="font-semibold text-slate-800">{{ $scoreToday['breakdown']['followup_compliance'] ?? 0 }}%</span>
-                            </p>
+                            </div>
+                            <p class="mt-3 text-4xl font-extrabold {{ $colorFor($scoreToday['score'] ?? 0) }}">{{ $scoreToday['score'] ?? 0 }}%</p>
+                            <div class="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
+                                <span>{{ __('Calls') }}: <strong class="text-slate-700">{{ $scoreToday['breakdown']['total_calls'] ?? 0 }}/{{ $scoreToday['breakdown']['daily_target'] ?? 25 }}</strong></span>
+                                <span>{{ __('Connected') }}: <strong class="text-slate-700">{{ $scoreToday['breakdown']['connected_rate'] ?? 0 }}%</strong></span>
+                                <span>{{ __('Follow-up') }}: <strong class="text-slate-700">{{ $scoreToday['breakdown']['followup_compliance'] ?? 0 }}%</strong></span>
+                            </div>
                         </div>
-
                         @if ($scoreOverall && ($scoreOverall['days'] ?? 0) > 0)
-                            <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
-                                <p class="text-sm font-medium text-slate-500">{{ __('Overall average (working days)') }}</p>
-                                <p class="mt-1 text-xs text-slate-500">
-                                    {{ __('Working days:') }} {{ $scoreOverall['days'] }}
-                                </p>
-                                <p class="mt-2 text-3xl font-extrabold text-slate-800">{{ $scoreOverall['score'] ?? 0 }}%</p>
+                            <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-5">
+                                <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide">{{ __('Overall Average') }}</p>
+                                <p class="mt-3 text-4xl font-extrabold text-slate-800">{{ $scoreOverall['score'] ?? 0 }}%</p>
+                                <p class="mt-3 text-xs text-slate-400">{{ __('Working days') }}: {{ $scoreOverall['days'] }}</p>
                             </div>
                         @endif
                     </div>
                 @endif
+
+                {{-- Activity summary --}}
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-5">
+                    <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">{{ __('Today\'s Activity') }}</p>
+                    <div class="grid grid-cols-3 gap-3 text-center">
+                        <div>
+                            <p class="text-2xl font-bold text-slate-800">{{ $stats['calls_today'] ?? 0 }}</p>
+                            <p class="text-[11px] text-slate-500">{{ __('Calls Made') }}</p>
+                        </div>
+                        <div>
+                            <p class="text-2xl font-bold text-rose-600">{{ $stats['not_connected_today'] ?? 0 }}</p>
+                            <p class="text-[11px] text-slate-500">{{ __('Not Connected') }}</p>
+                        </div>
+                        <div>
+                            <p class="text-2xl font-bold text-emerald-600">{{ $stats['messages_sent'] ?? 0 }}</p>
+                            <p class="text-[11px] text-slate-500">{{ __('Messages Sent') }}</p>
+                        </div>
+                    </div>
+                </div>
             @endif
         </div>
     </div>
