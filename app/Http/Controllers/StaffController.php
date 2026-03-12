@@ -47,8 +47,15 @@ class StaffController extends Controller
         $students = Student::with(['classSection.school'])
             ->where('assigned_to', $staff->id)
             ->orderBy('name')
-            ->limit(50)
             ->get();
+
+        $studentIds = $students->pluck('id')->all();
+        $callCountsByStudent = StudentCall::where('user_id', $staff->id)
+            ->whereIn('student_id', $studentIds)
+            ->selectRaw('student_id, count(*) as cnt')
+            ->groupBy('student_id')
+            ->pluck('cnt', 'student_id')
+            ->all();
 
         $campaigns = Campaign::with(['school', 'template'])
             ->where('shot_by', $staff->id)
@@ -71,6 +78,7 @@ class StaffController extends Controller
             ],
             'recentCalls' => $recentCalls,
             'students' => $students,
+            'callCountsByStudent' => $callCountsByStudent,
             'campaigns' => $campaigns,
             'messagesSent' => $messagesSent,
         ]);
@@ -124,6 +132,46 @@ class StaffController extends Controller
 
         return redirect()->route('admin.staff.index')
             ->with('success', __('Staff :name has been added.', ['name' => $validated['name']]));
+    }
+
+    public function revokeStudents(Request $request, User $staff)
+    {
+        abort_if($staff->isAdmin(), 404);
+
+        $data = $request->validate([
+            'student_ids' => 'required|array|min:1',
+            'student_ids.*' => 'integer|exists:students,id',
+        ]);
+
+        $revoked = 0;
+        foreach ($data['student_ids'] as $studentId) {
+            $student = Student::where('id', $studentId)
+                ->where('assigned_to', $staff->id)
+                ->first();
+
+            if (! $student) {
+                continue;
+            }
+
+            $hasCalls = StudentCall::where('student_id', $studentId)
+                ->where('user_id', $staff->id)
+                ->exists();
+
+            if ($hasCalls) {
+                continue;
+            }
+
+            $student->update([
+                'assigned_to' => null,
+                'assigned_by' => null,
+                'assigned_at' => null,
+                'lead_status' => 'lead',
+            ]);
+            $revoked++;
+        }
+
+        return redirect()->route('admin.staff.show', $staff)
+            ->with('success', __(':count student(s) revoked from :name.', ['count' => $revoked, 'name' => $staff->name]));
     }
 
     public function update(Request $request, User $staff)

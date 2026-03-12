@@ -240,6 +240,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('staff/{staff}', [StaffController::class, 'show'])->name('staff.show');
         Route::get('staff/{staff}/edit', [StaffController::class, 'edit'])->name('staff.edit');
         Route::patch('staff/{staff}', [StaffController::class, 'update'])->name('staff.update');
+        Route::post('staff/{staff}/revoke-students', [StaffController::class, 'revokeStudents'])->name('staff.revoke-students');
         Route::get('reset-data', [DataResetController::class, 'showResetForm'])->name('reset-data');
         Route::post('reset-data', [DataResetController::class, 'reset'])->name('reset-data.perform');
         Route::get('/', function () {
