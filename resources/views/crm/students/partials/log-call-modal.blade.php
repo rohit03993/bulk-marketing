@@ -1,7 +1,7 @@
 {{-- Log Call Result modal: Did the call connect? Who answered? Lead status? Notes & follow-up. --}}
 @php
     $leadStatuses = [
-        'lead' => __('Lead'),
+        'lead' => __('Uncalled'),
         'interested' => __('Interested'),
         'not_interested' => __('Not Interested'),
         'walkin_done' => __('Walk-in Done'),

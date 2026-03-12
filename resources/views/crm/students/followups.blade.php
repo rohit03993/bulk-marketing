@@ -109,7 +109,7 @@
                             $phones = array_filter([$student->whatsapp_phone_primary, $student->whatsapp_phone_secondary]);
                             $lead = $student->lead_status ?? 'lead';
                             $label = [
-                                'lead' => __('Lead'),
+                                'lead' => __('Uncalled'),
                                 'interested' => __('Interested'),
                                 'not_interested' => __('Not Interested'),
                                 'walkin_done' => __('Walk-in Done'),
@@ -201,7 +201,7 @@
                                 $phones = array_filter([$student->whatsapp_phone_primary, $student->whatsapp_phone_secondary]);
                                 $lead = $student->lead_status ?? 'lead';
                                 $label = [
-                                    'lead' => __('Lead'),
+                                    'lead' => __('Uncalled'),
                                     'interested' => __('Interested'),
                                     'not_interested' => __('Not Interested'),
                                     'walkin_done' => __('Walk-in Done'),

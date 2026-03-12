@@ -11,7 +11,7 @@
             @if (isset($student) && $student)
                 @php
                     $labels = [
-                        'lead' => __('Lead'),
+                        'lead' => __('Uncalled'),
                         'interested' => __('Interested'),
                         'not_interested' => __('Not Interested'),
                         'walkin_done' => __('Walk-in Done'),

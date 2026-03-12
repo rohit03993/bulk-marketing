@@ -55,7 +55,7 @@
                             $phoneDisplay = $phone ? '+91' . substr($phone, -10) : '';
                             $status = $current->lead_status ?? 'lead';
                             $statusLabels = [
-                                'lead' => __('Lead'),
+                                'lead' => __('Uncalled'),
                                 'interested' => __('Interested'),
                                 'not_interested' => __('Not Interested'),
                                 'walkin_done' => __('Walk-in Done'),
@@ -141,7 +141,7 @@
                         <div class="max-h-80 overflow-y-auto" id="queueList">
                             @php
                                 $statusLabels = [
-                                    'lead' => __('Lead'),
+                                    'lead' => __('Uncalled'),
                                     'interested' => __('Interested'),
                                     'not_interested' => __('Not Interested'),
                                     'walkin_done' => __('Walk-in Done'),

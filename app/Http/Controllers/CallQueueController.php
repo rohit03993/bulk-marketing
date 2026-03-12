@@ -158,7 +158,7 @@ class CallQueueController extends Controller
 
         $status = $student->lead_status ?? 'lead';
         $labels = [
-            'lead' => __('Lead'),
+            'lead' => __('Uncalled'),
             'interested' => __('Interested'),
             'not_interested' => __('Not Interested'),
             'walkin_done' => __('Walk-in Done'),

@@ -65,7 +65,7 @@
                             <label class="block text-xs font-medium text-gray-600">{{ __('Lead status') }}</label>
                             @php
                                 $leadStatuses = [
-                                    'lead' => __('Lead'),
+                                    'lead' => __('Uncalled'),
                                     'interested' => __('Interested'),
                                     'not_interested' => __('Not Interested'),
                                     'walkin_done' => __('Walk-in Done'),

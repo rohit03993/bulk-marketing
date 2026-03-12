@@ -128,7 +128,7 @@
                                     <div><span class="text-gray-500">{{ __('Lead status') }}:</span>
                                         @php
                                             $labels = [
-                                                'lead' => __('Lead'),
+                                                'lead' => __('Uncalled'),
                                                 'interested' => __('Interested'),
                                                 'not_interested' => __('Not Interested'),
                                                 'walkin_done' => __('Walk-in Done'),
@@ -184,7 +184,7 @@
                                         <td class="px-4 py-3 text-sm text-gray-600">
                                             @php
                                                 $labels = [
-                                                    'lead' => __('Lead'),
+                                                    'lead' => __('Uncalled'),
                                                     'interested' => __('Interested'),
                                                     'not_interested' => __('Not Interested'),
                                                     'walkin_done' => __('Walk-in Done'),
