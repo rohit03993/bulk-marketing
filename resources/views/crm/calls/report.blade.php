@@ -136,7 +136,10 @@
                                 @endphp
                                 <tr class="hover:bg-slate-50/70">
                                     <td class="px-4 py-3 text-sm text-slate-700 whitespace-nowrap">
-                                        {{ $c->called_at?->format('d M Y, h:i A') ?? '—' }}
+                                        <div>{{ $c->called_at?->format('d M Y, h:i A') ?? '—' }}</div>
+                                        @if ($c->call_direction === 'incoming')
+                                            <span class="inline-flex items-center gap-0.5 mt-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-amber-100 text-amber-800">↓ {{ __('Incoming') }}</span>
+                                        @endif
                                     </td>
                                     <td class="px-4 py-3 text-sm">
                                         @if ($c->student)

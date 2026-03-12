@@ -13,6 +13,7 @@ class StudentCall extends Model
         'student_id',
         'user_id',
         'call_status',
+        'call_direction',
         'who_answered',
         'duration_minutes',
         'call_notes',

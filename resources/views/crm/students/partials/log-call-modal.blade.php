@@ -1,7 +1,6 @@
 {{-- Log Call Result modal: Did the call connect? Who answered? Lead status? Notes & follow-up. --}}
 @php
     $leadStatuses = [
-        'lead' => __('Uncalled'),
         'interested' => __('Interested'),
         'not_interested' => __('Not Interested'),
         'walkin_done' => __('Walk-in Done'),
@@ -12,8 +11,8 @@
 <div id="logCallModalOverlay" class="fixed inset-0 z-30 hidden bg-black/40" style="display: none;"></div>
 <div id="logCallModal" class="fixed inset-x-0 bottom-0 z-40 hidden sm:inset-0 sm:flex sm:items-center sm:justify-center" style="display: none;">
     <div class="bg-white rounded-t-2xl sm:rounded-2xl shadow-xl w-full sm:max-w-lg mx-auto max-h-[90vh] overflow-hidden flex flex-col">
-        <div class="px-4 py-3 bg-indigo-600 text-white flex justify-between items-center shrink-0">
-            <h3 class="font-semibold">📞 {{ __('Log Call Result') }}</h3>
+        <div id="logCallModalHeader" class="px-4 py-3 bg-indigo-600 text-white flex justify-between items-center shrink-0">
+            <h3 class="font-semibold" id="logCallModalTitle">📞 {{ __('Log Call Result') }}</h3>
             <button type="button" onclick="closeLogCallModal()" class="text-white/90 hover:text-white text-2xl leading-none">&times;</button>
         </div>
         <div class="p-4 overflow-y-auto flex-1">
@@ -23,6 +22,7 @@
             </div>
             <form id="quickCallForm">
                 <input type="hidden" name="call_connected" id="callConnectedField" value="">
+                <input type="hidden" name="call_direction" id="callDirectionField" value="outgoing">
                 <input type="hidden" name="who_answered" id="whoAnsweredField" value="">
                 <input type="hidden" name="lead_status" id="leadStatusField" value="">
                 <input type="hidden" name="call_status" id="callStatusField" value="">
@@ -148,10 +148,11 @@
     }
 
     function resetLogCallWizard() {
-        logCallData = { leadId: null, connected: null, whoAnswered: null, leadStatus: null, callStatus: null, tags: [], requiresFollowup: true };
+        logCallData = { leadId: null, connected: null, whoAnswered: null, leadStatus: null, callStatus: null, tags: [], requiresFollowup: true, direction: 'outgoing' };
         var form = document.getElementById('quickCallForm');
         if (form) form.reset();
         var f = document.getElementById('callConnectedField'); if (f) f.value = '';
+        f = document.getElementById('callDirectionField'); if (f) f.value = 'outgoing';
         f = document.getElementById('whoAnsweredField'); if (f) f.value = '';
         f = document.getElementById('leadStatusField'); if (f) f.value = '';
         f = document.getElementById('callStatusField'); if (f) f.value = '';
@@ -170,15 +171,32 @@
         });
         var err = document.getElementById('validationErrors');
         if (err) err.textContent = '';
+        var title = document.getElementById('logCallModalTitle');
+        var header = document.getElementById('logCallModalHeader');
+        if (title) title.textContent = '📞 {{ __("Log Call Result") }}';
+        if (header) { header.classList.remove('bg-amber-600'); header.classList.add('bg-indigo-600'); }
     }
 
-    window.openQuickCallModal = function(leadId, leadName, leadPhone) {
+    window.openQuickCallModal = function(leadId, leadName, leadPhone, direction) {
         resetLogCallWizard();
         logCallData.leadId = leadId;
+        logCallData.direction = direction || 'outgoing';
+        var dirField = document.getElementById('callDirectionField');
+        if (dirField) dirField.value = logCallData.direction;
         var nameEl = document.getElementById('logCallLeadName');
         var phoneEl = document.getElementById('logCallLeadPhone');
         if (nameEl) nameEl.textContent = leadName || '';
         if (phoneEl) phoneEl.textContent = leadPhone || '';
+
+        if (logCallData.direction === 'incoming') {
+            var title = document.getElementById('logCallModalTitle');
+            var header = document.getElementById('logCallModalHeader');
+            if (title) title.textContent = '📲 {{ __("Log Incoming Call") }}';
+            if (header) { header.classList.remove('bg-indigo-600'); header.classList.add('bg-amber-600'); }
+            setConnected(true);
+            hide(document.getElementById('step1'));
+        }
+
         var overlay = document.getElementById('logCallModalOverlay');
         var modal = document.getElementById('logCallModal');
         if (overlay) { overlay.classList.remove('hidden'); overlay.style.display = 'block'; }
@@ -403,6 +421,7 @@
         submitBtn.textContent = '{{ __("Saving...") }}';
         var formData = new FormData(form);
         formData.set('call_connected', logCallData.connected ? '1' : '0');
+        formData.set('call_direction', logCallData.direction || 'outgoing');
         document.querySelectorAll('.tag-btn.bg-indigo-600').forEach(btn => {
             formData.append('tags[]', btn.dataset.tag);
         });

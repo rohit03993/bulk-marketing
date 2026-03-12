@@ -47,7 +47,13 @@
                     </div>
                 </div>
 
-                <div class="flex flex-wrap gap-2">
+                    <div class="flex flex-wrap gap-2">
+                    <button type="button"
+                        onclick="openQuickCallModal({{ $student->id }}, '{{ addslashes($student->name) }}', '{{ $phones[0] ?? '' }}', 'incoming')"
+                        class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-500 text-white text-xs font-semibold hover:bg-amber-600 shadow-sm">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.828 14.828a4 4 0 01-5.656 0M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        {{ __('Log Incoming Call') }}
+                    </button>
                     <a href="{{ route('students.profile.edit', $student) }}"
                        class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white text-slate-900 text-xs font-semibold hover:bg-slate-50">
                         {{ __('Edit') }}
@@ -191,7 +197,18 @@
                                         @foreach ($calls as $c)
                                             <tr class="align-top hover:bg-slate-50/70">
                                                 <td class="py-2 pr-4 whitespace-nowrap text-gray-700">
-                                                    {{ $c->called_at?->format('d M Y, h:i A') ?? $c->created_at?->format('d M Y, h:i A') }}
+                                                    <div>{{ $c->called_at?->format('d M Y, h:i A') ?? $c->created_at?->format('d M Y, h:i A') }}</div>
+                                                    @if ($c->call_direction === 'incoming')
+                                                        <span class="inline-flex items-center gap-0.5 mt-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-amber-100 text-amber-800">
+                                                            <svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 14l-7 7m0 0l-7-7m7 7V3"/></svg>
+                                                            {{ __('Incoming') }}
+                                                        </span>
+                                                    @else
+                                                        <span class="inline-flex items-center gap-0.5 mt-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-sky-100 text-sky-800">
+                                                            <svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 10l7-7m0 0l7 7m-7-7v18"/></svg>
+                                                            {{ __('Outgoing') }}
+                                                        </span>
+                                                    @endif
                                                 </td>
                                                 <td class="py-2 pr-4 whitespace-nowrap">
                                                     <div class="font-medium text-gray-900">

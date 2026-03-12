@@ -16,10 +16,16 @@ class StudentCallController extends Controller
      */
     public function store(Request $request, Student $student)
     {
+        $callDirection = $request->input('call_direction', 'outgoing');
+        if (! in_array($callDirection, ['outgoing', 'incoming'], true)) {
+            $callDirection = 'outgoing';
+        }
+
         $wizard = $request->has('call_connected');
         if ($wizard) {
             $rules = [
                 'call_connected' => 'required|boolean',
+                'call_direction' => 'nullable|in:outgoing,incoming',
                 'duration_minutes' => 'nullable|integer|min:0|max:600',
                 'tags' => 'nullable|array',
                 'tags.*' => 'string|in:' . implode(',', array_keys(StudentCall::$quickTags)),
@@ -59,6 +65,7 @@ class StudentCallController extends Controller
         $call->student_id = $student->id;
         $call->user_id = $user->id;
         $call->call_status = $callStatus;
+        $call->call_direction = $callDirection;
         $call->duration_minutes = (int) ($data['duration_minutes'] ?? 0);
         $call->call_notes = $data['call_notes'] ?? null;
         $call->status_changed_to = $newLeadStatus;
