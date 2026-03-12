@@ -23,6 +23,11 @@ class StudentLeadController extends Controller
         if ($request->filled('status') && $request->status !== 'all') {
             $query->where('lead_status', $request->status);
         }
+        if ($request->has('called')) {
+            $request->called == '0'
+                ? $query->where('total_calls', 0)
+                : $query->where('total_calls', '>', 0);
+        }
         if ($request->filled('search')) {
             $s = $request->search;
             $query->where(function ($q) use ($s) {

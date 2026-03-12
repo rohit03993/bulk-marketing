@@ -36,6 +36,14 @@
                             @endforeach
                         </select>
                     </div>
+                    <div class="min-w-[120px]">
+                        <label class="block text-xs font-medium text-gray-500">{{ __('Called') }}</label>
+                        <select name="called" class="mt-1 block w-full rounded-md border-gray-300 text-sm">
+                            <option value="">{{ __('Any') }}</option>
+                            <option value="0" {{ request('called') === '0' ? 'selected' : '' }}>{{ __('Not called') }}</option>
+                            <option value="1" {{ request('called') === '1' ? 'selected' : '' }}>{{ __('Called') }}</option>
+                        </select>
+                    </div>
                     <div class="flex-1 min-w-[160px]">
                         <label class="block text-xs font-medium text-gray-500">{{ __('Search name / phone') }}</label>
                         <input type="text" name="search" value="{{ request('search') }}" placeholder="{{ __('Search…') }}"

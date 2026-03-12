@@ -19,6 +19,7 @@
     <body class="font-sans antialiased" style="font-family: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;">
         <div class="min-h-screen bg-slate-50">
             @include('layouts.navigation')
+            @include('layouts.followup-alert')
 
             <!-- Page Heading -->
             @isset($header)

@@ -105,16 +105,31 @@ class StudentCallController extends Controller
     public function suggestFollowup(Request $request)
     {
         $leadStatus = $request->input('lead_status');
+        $connected = $request->boolean('call_connected');
         $now = Carbon::now();
-        $suggested = $now->copy()->addDay()->setHour(10)->setMinute(0)->setSecond(0);
-        $label = $suggested->format('d M, h:i A');
-        if (in_array($leadStatus, ['interested', 'follow_up_later'], true)) {
+
+        if ($connected && in_array($leadStatus, ['interested', 'follow_up_later'], true)) {
             $suggested = $now->copy()->addDays(2)->setHour(10)->setMinute(0)->setSecond(0);
-            $label = $suggested->format('d M, h:i A');
+        } elseif (! $connected) {
+            $suggested = $now->copy()->addHours(2)->minute(0)->second(0);
+        } else {
+            $suggested = $now->copy()->addDay()->setHour(10)->setMinute(0)->setSecond(0);
         }
+
+        if ($suggested->lte($now)) {
+            $suggested = $now->copy()->addHour()->minute(0)->second(0);
+        }
+        if ($suggested->hour < 9) {
+            $suggested->setHour(9)->setMinute(0);
+        } elseif ($suggested->hour >= 20) {
+            $suggested->addDay()->setHour(9)->setMinute(0);
+        }
+
         return response()->json([
             'suggested_datetime' => $suggested->format('Y-m-d\TH:i'),
-            'suggested_label' => $label,
+            'suggested_label' => $suggested->isToday()
+                ? __('Today') . ', ' . $suggested->format('h:i A')
+                : $suggested->format('d M, h:i A'),
         ]);
     }
 

@@ -97,21 +97,28 @@
                     <p class="text-xs text-gray-500 mt-1" id="notesHint">{{ __('Minimum 10 characters required') }}</p>
                 </div>
 
-                {{-- Follow-up (date only, from tomorrow onward) --}}
+                {{-- Follow-up (date + time, today allowed) --}}
                 <div id="step5Followup" class="hidden mb-4">
                     <label class="block text-sm font-semibold text-gray-700 mb-2">6. {{ __('Schedule follow-up') }} <span id="followupRequiredStar" class="text-red-500">*</span></label>
-                    <p class="text-xs text-gray-500 mb-3">{{ __('Pick a date from tomorrow onward. Past and today are not allowed.') }}</p>
-                    <div class="flex flex-wrap gap-2 mb-3">
-                        <button type="button" class="followup-quick px-3 py-2 rounded-xl border border-gray-200 text-sm font-medium hover:border-indigo-300 hover:bg-indigo-50 transition" data-days="1">{{ __('Tomorrow') }}</button>
-                        <button type="button" class="followup-quick px-3 py-2 rounded-xl border border-gray-200 text-sm font-medium hover:border-indigo-300 hover:bg-indigo-50 transition" data-days="3">3 {{ __('days') }}</button>
-                        <button type="button" class="followup-quick px-3 py-2 rounded-xl border border-gray-200 text-sm font-medium hover:border-indigo-300 hover:bg-indigo-50 transition" data-days="7">1 {{ __('week') }}</button>
-                        <button type="button" class="followup-quick px-3 py-2 rounded-xl border border-gray-200 text-sm font-medium hover:border-indigo-300 hover:bg-indigo-50 transition" data-days="14">2 {{ __('weeks') }}</button>
+                    <p class="text-xs text-gray-500 mb-3">{{ __('Quick pick or choose a custom date & time') }}</p>
+                    <div class="flex flex-wrap gap-1.5 mb-3">
+                        <button type="button" class="followup-quick px-2.5 py-1.5 rounded-lg border border-gray-200 text-xs font-medium hover:border-indigo-300 hover:bg-indigo-50 transition" data-hours="2">{{ __('In 2 hrs') }}</button>
+                        <button type="button" class="followup-quick px-2.5 py-1.5 rounded-lg border border-gray-200 text-xs font-medium hover:border-indigo-300 hover:bg-indigo-50 transition" data-hours="4">{{ __('In 4 hrs') }}</button>
+                        <button type="button" class="followup-quick px-2.5 py-1.5 rounded-lg border border-amber-200 bg-amber-50 text-xs font-medium hover:border-amber-300 hover:bg-amber-100 transition" data-time="18:00">{{ __('Today 6 PM') }}</button>
+                        <button type="button" class="followup-quick px-2.5 py-1.5 rounded-lg border border-gray-200 text-xs font-medium hover:border-indigo-300 hover:bg-indigo-50 transition" data-days="1">{{ __('Tomorrow') }}</button>
+                        <button type="button" class="followup-quick px-2.5 py-1.5 rounded-lg border border-gray-200 text-xs font-medium hover:border-indigo-300 hover:bg-indigo-50 transition" data-days="3">{{ __('3 days') }}</button>
+                        <button type="button" class="followup-quick px-2.5 py-1.5 rounded-lg border border-gray-200 text-xs font-medium hover:border-indigo-300 hover:bg-indigo-50 transition" data-days="7">{{ __('1 week') }}</button>
+                        <button type="button" class="followup-quick px-2.5 py-1.5 rounded-lg border border-gray-200 text-xs font-medium hover:border-indigo-300 hover:bg-indigo-50 transition" data-days="14">{{ __('2 weeks') }}</button>
                     </div>
-                    <div class="relative">
-                        <input type="date" id="followupDateField" class="w-full rounded-xl border border-gray-200 py-3 pl-4 pr-10 text-sm shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition" placeholder="">
-                        <span class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-                        </span>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div class="relative">
+                            <label class="block text-[11px] font-medium text-gray-500 mb-1">{{ __('Date') }}</label>
+                            <input type="date" id="followupDateField" class="w-full rounded-xl border border-gray-200 py-2.5 pl-3 pr-3 text-sm shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition">
+                        </div>
+                        <div class="relative">
+                            <label class="block text-[11px] font-medium text-gray-500 mb-1">{{ __('Time') }}</label>
+                            <input type="time" id="followupTimeField" value="10:00" min="09:00" max="20:00" class="w-full rounded-xl border border-gray-200 py-2.5 pl-3 pr-3 text-sm shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition">
+                        </div>
                     </div>
                     <input type="hidden" name="next_followup_at" id="followupDateTimeHidden" value="">
                     <p class="text-xs text-gray-500 mt-2" id="followupSuggestion"></p>
@@ -148,6 +155,7 @@
         f = document.getElementById('whoAnsweredField'); if (f) f.value = '';
         f = document.getElementById('leadStatusField'); if (f) f.value = '';
         f = document.getElementById('callStatusField'); if (f) f.value = '';
+        var tf = document.getElementById('followupTimeField'); if (tf) tf.value = '10:00';
         ['step2Connected','step2NotConnected','stepDuration','step3Tags','step4Notes','step5Followup','submitSection'].forEach(function(id) {
             hide(document.getElementById(id));
         });
@@ -277,23 +285,41 @@
             this.classList.toggle('border-gray-300', !this.classList.contains('bg-indigo-600'));
         });
     });
-    function getTomorrowDateString() {
+    function getTodayDateString() {
         var d = new Date();
-        d.setDate(d.getDate() + 1);
-        return d.toISOString().slice(0, 10);
+        return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
     }
-    function setFollowupDateFromDays(days) {
-        var d = new Date();
-        d.setDate(d.getDate() + days);
-        return d.toISOString().slice(0, 10);
+    function localDateString(d) {
+        return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+    }
+    function localTimeString(d) {
+        return String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+    }
+    function setFollowupDateTime(dateStr, timeStr) {
+        var dateInput = document.getElementById('followupDateField');
+        var timeInput = document.getElementById('followupTimeField');
+        if (dateInput) dateInput.value = dateStr;
+        if (timeInput) timeInput.value = timeStr;
     }
 
+    function clampTime(d) {
+        if (d.getHours() < 9) { d.setHours(9, 0, 0); }
+        if (d.getHours() >= 20) { d.setDate(d.getDate() + 1); d.setHours(9, 0, 0); }
+        return d;
+    }
     document.querySelectorAll('.followup-quick').forEach(btn => {
         btn.addEventListener('click', function() {
-            var days = parseInt(this.dataset.days, 10);
-            var dateStr = setFollowupDateFromDays(days);
-            var input = document.getElementById('followupDateField');
-            if (input) input.value = dateStr;
+            var d = new Date();
+            if (this.dataset.hours) {
+                d.setHours(d.getHours() + parseInt(this.dataset.hours, 10));
+                d = clampTime(d);
+                setFollowupDateTime(localDateString(d), localTimeString(d));
+            } else if (this.dataset.time) {
+                setFollowupDateTime(getTodayDateString(), this.dataset.time);
+            } else if (this.dataset.days) {
+                d.setDate(d.getDate() + parseInt(this.dataset.days, 10));
+                setFollowupDateTime(localDateString(d), '10:00');
+            }
             document.querySelectorAll('.followup-quick').forEach(function(b) { b.classList.remove('bg-indigo-600','text-white','border-indigo-500'); b.classList.add('border-gray-200'); });
             this.classList.add('bg-indigo-600','text-white','border-indigo-500'); this.classList.remove('border-gray-200');
         });
@@ -302,13 +328,14 @@
     function suggestFollowup() {
         var star = document.getElementById('followupRequiredStar');
         var dateInput = document.getElementById('followupDateField');
+        var timeInput = document.getElementById('followupTimeField');
         var suggestionEl = document.getElementById('followupSuggestion');
-        var tomorrow = getTomorrowDateString();
+        var today = getTodayDateString();
         if (logCallData.requiresFollowup) {
             star.style.display = 'inline';
             if (dateInput) {
-                dateInput.setAttribute('min', tomorrow);
-                if (!dateInput.value || dateInput.value < tomorrow) dateInput.value = tomorrow;
+                dateInput.setAttribute('min', today);
+                if (!dateInput.value || dateInput.value < today) dateInput.value = today;
             }
             fetch('{{ route("students.call.suggest-followup") }}', {
                 method: 'POST',
@@ -317,13 +344,16 @@
             }).then(r => r.json()).then(data => {
                 if (data.suggested_datetime && dateInput) {
                     var datePart = (data.suggested_datetime + '').slice(0, 10);
-                    if (datePart && datePart >= tomorrow) dateInput.value = datePart;
+                    if (datePart && datePart >= today) dateInput.value = datePart;
+                    var timePart = (data.suggested_datetime + '').slice(11, 16);
+                    if (timePart && timeInput) timeInput.value = timePart;
                 }
                 if (suggestionEl && data.suggested_label) suggestionEl.textContent = '💡 ' + (data.suggested_label || '');
             }).catch(function() {});
         } else {
             star.style.display = 'none';
             if (dateInput) { dateInput.value = ''; dateInput.removeAttribute('min'); }
+            if (timeInput) timeInput.value = '10:00';
             if (suggestionEl) suggestionEl.textContent = '{{ __("No follow-up needed") }}';
         }
     }
@@ -341,10 +371,21 @@
         }
         if (logCallData.connected === false && !logCallData.callStatus) errors.push('{{ __("Select reason for not connecting") }}');
         var dateInput = document.getElementById('followupDateField');
-        var tomorrow = getTomorrowDateString();
+        var timeInput = document.getElementById('followupTimeField');
+        var today = getTodayDateString();
         if (logCallData.requiresFollowup) {
             if (!dateInput || !dateInput.value) errors.push('{{ __("Schedule a follow-up") }}');
-            else if (dateInput.value < tomorrow) errors.push('{{ __("Follow-up date must be tomorrow or later") }}');
+            else if (dateInput.value < today) errors.push('{{ __("Follow-up date cannot be in the past") }}');
+            else {
+                var picked = (timeInput && timeInput.value) ? timeInput.value : '10:00';
+                var pickedMinutes = parseInt(picked.split(':')[0],10)*60 + parseInt(picked.split(':')[1],10);
+                if (pickedMinutes < 540 || pickedMinutes > 1200) errors.push('{{ __("Follow-up time must be between 9 AM and 8 PM") }}');
+                else if (dateInput.value === today) {
+                    var now = new Date();
+                    var nowMinutes = now.getHours()*60 + now.getMinutes();
+                    if (pickedMinutes <= nowMinutes) errors.push('{{ __("Follow-up time must be later than now") }}');
+                }
+            }
         }
         if (!logCallData.leadId || logCallData.leadId === 'null' || logCallData.leadId === 'undefined') {
             errors.push('{{ __("Lead not found. Please close and start the call again from the queue.") }}');
@@ -354,7 +395,8 @@
             return;
         }
         var hiddenDatetime = document.getElementById('followupDateTimeHidden');
-        if (hiddenDatetime && dateInput && dateInput.value) hiddenDatetime.value = dateInput.value + 'T10:00:00';
+        var timeVal = (timeInput && timeInput.value) ? timeInput.value : '10:00';
+        if (hiddenDatetime && dateInput && dateInput.value) hiddenDatetime.value = dateInput.value + 'T' + timeVal + ':00';
         var form = this;
         var submitBtn = document.getElementById('quickCallSubmit');
         submitBtn.disabled = true;

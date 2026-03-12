@@ -111,13 +111,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
         $myLeadsQuery = \App\Models\Student::where('assigned_to', $userId);
         $stats = [
             'assigned_leads' => (clone $myLeadsQuery)->count(),
-            'lead_new' => (clone $myLeadsQuery)->where('lead_status', 'lead')->count(),
+            'lead_new' => (clone $myLeadsQuery)->where('lead_status', 'lead')->where('total_calls', 0)->count(),
+            'total_calls_ever' => \App\Models\StudentCall::where('user_id', $userId)->count(),
             'lead_interested' => (clone $myLeadsQuery)->where('lead_status', 'interested')->count(),
             'lead_followup_later' => (clone $myLeadsQuery)->where('lead_status', 'follow_up_later')->count(),
             'lead_walkin_done' => (clone $myLeadsQuery)->where('lead_status', 'walkin_done')->count(),
             'lead_admission_done' => (clone $myLeadsQuery)->where('lead_status', 'admission_done')->count(),
             'lead_not_interested' => (clone $myLeadsQuery)->where('lead_status', 'not_interested')->count(),
-            'not_called' => (clone $myLeadsQuery)->where('total_calls', 0)->count(),
             'followups_window' => (clone $myLeadsQuery)
                 ->whereNotNull('next_followup_at')
                 ->where('next_followup_at', '<=', $upcomingUntil)
