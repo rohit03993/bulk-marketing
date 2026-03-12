@@ -111,6 +111,7 @@ class StaffController extends Controller
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'email', 'max:255', 'unique:users'],
+            'phone' => ['nullable', 'string', 'max:20'],
             'password' => ['required', 'confirmed', Password::defaults()],
             'can_access_schools' => ['sometimes', 'boolean'],
             'can_access_students' => ['sometimes', 'boolean'],
@@ -121,6 +122,7 @@ class StaffController extends Controller
         User::create([
             'name' => $validated['name'],
             'email' => $validated['email'],
+            'phone' => $validated['phone'] ?? null,
             'password' => Hash::make($validated['password']),
             'is_admin' => false,
             'created_by' => auth()->id(),
@@ -181,6 +183,7 @@ class StaffController extends Controller
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'email', 'max:255', 'unique:users,email,' . $staff->id],
+            'phone' => ['nullable', 'string', 'max:20'],
             'password' => ['nullable', 'confirmed', Password::defaults()],
             'can_access_schools' => ['sometimes', 'boolean'],
             'can_access_students' => ['sometimes', 'boolean'],
@@ -191,6 +194,7 @@ class StaffController extends Controller
         $update = [
             'name' => $validated['name'],
             'email' => $validated['email'],
+            'phone' => $validated['phone'] ?? null,
             'can_access_schools' => (bool) ($validated['can_access_schools'] ?? false),
             'can_access_students' => (bool) ($validated['can_access_students'] ?? false),
             'can_access_campaigns' => (bool) ($validated['can_access_campaigns'] ?? false),

@@ -62,7 +62,7 @@
                     <div>
                         <x-input-label for="lead_status" :value="__('Lead status')" />
                         <select id="lead_status" name="lead_status" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-                            <option value="lead" {{ old('lead_status', 'lead') === 'lead' ? 'selected' : '' }}>{{ __('Lead') }}</option>
+                            <option value="lead" {{ old('lead_status', 'lead') === 'lead' ? 'selected' : '' }}>{{ __('Uncalled') }}</option>
                             <option value="interested" {{ old('lead_status') === 'interested' ? 'selected' : '' }}>{{ __('Interested') }}</option>
                             <option value="not_interested" {{ old('lead_status') === 'not_interested' ? 'selected' : '' }}>{{ __('Not Interested') }}</option>
                             <option value="walkin_done" {{ old('lead_status') === 'walkin_done' ? 'selected' : '' }}>{{ __('Walk-in Done') }}</option>

@@ -64,7 +64,7 @@
                             @php
                                 $currentLeadStatus = old('lead_status', $student->lead_status ?? 'lead');
                             @endphp
-                            <option value="lead" {{ $currentLeadStatus === 'lead' ? 'selected' : '' }}>{{ __('Lead') }}</option>
+                            <option value="lead" {{ $currentLeadStatus === 'lead' ? 'selected' : '' }}>{{ __('Uncalled') }}</option>
                             <option value="interested" {{ $currentLeadStatus === 'interested' ? 'selected' : '' }}>{{ __('Interested') }}</option>
                             <option value="not_interested" {{ $currentLeadStatus === 'not_interested' ? 'selected' : '' }}>{{ __('Not Interested') }}</option>
                             <option value="walkin_done" {{ $currentLeadStatus === 'walkin_done' ? 'selected' : '' }}>{{ __('Walk-in Done') }}</option>

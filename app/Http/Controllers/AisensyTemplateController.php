@@ -20,6 +20,8 @@ class AisensyTemplateController extends Controller
             'class.name' => __('Class number'),
             'class.section' => __('Section'),
             'session.name' => __('Session name'),
+            'caller.name' => __('Caller / Staff name'),
+            'caller.phone' => __('Caller / Staff phone'),
         ];
     }
 

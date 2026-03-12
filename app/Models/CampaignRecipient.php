@@ -12,6 +12,7 @@ class CampaignRecipient extends Model
     protected $fillable = [
         'campaign_id',
         'student_id',
+        'student_call_id',
         'phone',
         'status',
         'template_params',

@@ -240,6 +240,19 @@
                                                             @endforeach
                                                         </div>
                                                     @endif
+                                                    @if ($c->whatsapp_auto_status)
+                                                        <div class="mt-1.5">
+                                                            @if ($c->whatsapp_auto_status === 'success')
+                                                                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-green-100 text-green-800">✓ {{ __('WhatsApp sent') }}</span>
+                                                            @elseif ($c->whatsapp_auto_status === 'queued')
+                                                                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-blue-100 text-blue-700">⏳ {{ __('WhatsApp queued') }}</span>
+                                                            @elseif ($c->whatsapp_auto_status === 'skipped')
+                                                                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-gray-100 text-gray-600">— {{ __('WhatsApp skipped') }}</span>
+                                                            @else
+                                                                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-red-100 text-red-700">✗ {{ __('WhatsApp failed') }}</span>
+                                                            @endif
+                                                        </div>
+                                                    @endif
                                                 </td>
                                             </tr>
                                         @endforeach

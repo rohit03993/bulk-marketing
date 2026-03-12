@@ -5,6 +5,8 @@ namespace App\Console\Commands;
 use App\Jobs\RunCampaignJob;
 use App\Models\Campaign;
 use App\Models\CampaignRecipient;
+use App\Models\StudentCall;
+use App\Models\User;
 use App\Services\AisensyService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
@@ -46,6 +48,8 @@ class RunCampaign extends Command
         $template = $campaign->template;
         $paramSources = $template->getParamSources();
 
+        $shotByUser = $campaign->shot_by ? User::find($campaign->shot_by) : null;
+
         $pending = CampaignRecipient::where('campaign_id', $campaign->id)
             ->where('status', 'pending')
             ->limit($batchSize)
@@ -71,7 +75,7 @@ class RunCampaign extends Command
                     continue;
                 }
 
-                $templateParams[] = $this->resolveParamSource($source, $student, $classSection, $school, $session);
+                $templateParams[] = $this->resolveParamSource($source, $student, $classSection, $school, $session, $shotByUser);
             }
 
             $result = $aisensy->send($recipient->phone, $templateParams, $template->name);
@@ -92,6 +96,12 @@ class RunCampaign extends Command
             }
 
             $recipient->save();
+
+            if ($recipient->student_call_id) {
+                StudentCall::where('id', $recipient->student_call_id)->update([
+                    'whatsapp_auto_status' => $recipient->status === 'sent' ? 'success' : 'failed',
+                ]);
+            }
         }
 
         $sentCount = CampaignRecipient::where('campaign_id', $campaign->id)->where('status', 'sent')->count();
@@ -138,9 +148,8 @@ class RunCampaign extends Command
         return $message;
     }
 
-    protected function resolveParamSource(string $source, $student, $classSection, $school, $session): string
+    protected function resolveParamSource(string $source, $student, $classSection, $school, $session, ?User $shotByUser = null): string
     {
-        // Static text in quotes: "Dear Parent"
         if (str_starts_with($source, '"') && str_ends_with($source, '"')) {
             return trim($source, '"');
         }
@@ -156,6 +165,8 @@ class RunCampaign extends Command
             'class.name' => (string) ($classSection->class_name ?? ''),
             'class.section' => (string) ($classSection->section_name ?? ''),
             'session.name' => (string) ($session->name ?? ''),
+            'caller.name' => (string) ($shotByUser?->name ?? ''),
+            'caller.phone' => (string) ($shotByUser?->phone ?? ''),
             default => '',
         };
     }

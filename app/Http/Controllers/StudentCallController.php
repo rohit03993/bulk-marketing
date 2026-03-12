@@ -2,6 +2,11 @@
 
 namespace App\Http\Controllers;
 
+use App\Jobs\RunCampaignJob;
+use App\Models\AisensyTemplate;
+use App\Models\Campaign;
+use App\Models\CampaignRecipient;
+use App\Models\Setting;
 use App\Models\Student;
 use App\Models\StudentCall;
 use Illuminate\Http\Request;
@@ -96,6 +101,10 @@ class StudentCallController extends Controller
         }
         $student->save();
 
+        if ($callDirection === 'outgoing' && $callStatus === StudentCall::STATUS_CONNECTED) {
+            $this->firePostCallWhatsApp($call, $student, $user);
+        }
+
         if ($request->ajax() || $request->wantsJson()) {
             return response()->json([
                 'success' => true,
@@ -138,6 +147,63 @@ class StudentCallController extends Controller
                 ? __('Today') . ', ' . $suggested->format('h:i A')
                 : $suggested->format('d M, h:i A'),
         ]);
+    }
+
+    protected function firePostCallWhatsApp(StudentCall $call, Student $student, $user): void
+    {
+        try {
+            if (! Setting::get('postcall_autosend_enabled')) {
+                return;
+            }
+
+            $templateId = Setting::get('postcall_autosend_template_id');
+            if (! $templateId) {
+                return;
+            }
+
+            $template = AisensyTemplate::find($templateId);
+            if (! $template) {
+                return;
+            }
+
+            $studentPhone = $student->whatsapp_phone_primary;
+            if (! $studentPhone) {
+                $call->update(['whatsapp_auto_status' => 'skipped']);
+                return;
+            }
+
+            $student->load('classSection.school', 'classSection.academicSession');
+            $classSection = $student->classSection;
+
+            $campaign = Campaign::create([
+                'name' => $template->name,
+                'school_id' => $classSection?->school_id,
+                'academic_session_id' => $classSection?->academic_session_id,
+                'aisensy_template_id' => $template->id,
+                'status' => 'queued',
+                'total_recipients' => 1,
+                'sent_count' => 0,
+                'failed_count' => 0,
+                'created_by' => $user->id,
+                'shot_by' => $user->id,
+                'shot_at' => now(),
+            ]);
+
+            CampaignRecipient::create([
+                'campaign_id' => $campaign->id,
+                'student_id' => $student->id,
+                'student_call_id' => $call->id,
+                'phone' => $studentPhone,
+                'status' => 'pending',
+            ]);
+
+            $call->update(['whatsapp_auto_status' => 'queued']);
+
+            RunCampaignJob::dispatch($campaign->id);
+        } catch (\Throwable $e) {
+            $call->update(['whatsapp_auto_status' => 'failed']);
+            \Illuminate\Support\Facades\Log::warning('Post-call WhatsApp failed: ' . $e->getMessage());
+        }
     }
 
     protected function computeNextFollowupAt(string $callStatus): ?Carbon

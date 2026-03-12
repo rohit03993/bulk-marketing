@@ -169,6 +169,13 @@
                                                 {{ __('Follow-up:') }} {{ $c->next_followup_at?->format('d M Y') }}
                                             </div>
                                         @endif
+                                        @if ($c->whatsapp_auto_status === 'success')
+                                            <span class="inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-green-100 text-green-800">✓ {{ __('WA sent') }}</span>
+                                        @elseif ($c->whatsapp_auto_status === 'queued')
+                                            <span class="inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-blue-100 text-blue-700">⏳ {{ __('WA queued') }}</span>
+                                        @elseif ($c->whatsapp_auto_status === 'failed')
+                                            <span class="inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-red-100 text-red-700">✗ {{ __('WA failed') }}</span>
+                                        @endif
                                     </td>
                                 </tr>
                             @empty

@@ -33,6 +33,16 @@
                         @enderror
                     </div>
 
+                    <div>
+                        <label for="phone" class="block text-sm font-medium text-slate-700">{{ __('Phone number') }}</label>
+                        <input type="tel" name="phone" id="phone" value="{{ old('phone', $staff->phone) }}" placeholder="e.g. 9876543210"
+                               class="mt-1 block w-full rounded-lg border-slate-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                        <p class="mt-1 text-xs text-slate-500">{{ __('Used as caller number in auto-send WhatsApp messages after calls.') }}</p>
+                        @error('phone')
+                            <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                        @enderror
+                    </div>
+
                     <div class="pt-2">
                         <p class="text-sm font-medium text-slate-800">{{ __('Permissions') }}</p>
                         <p class="mt-1 text-xs text-slate-600">{{ __('Enable or disable access for this staff member.') }}</p>

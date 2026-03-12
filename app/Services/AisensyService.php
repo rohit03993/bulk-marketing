@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Setting;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 class AisensyService
 {
@@ -47,12 +48,25 @@ class AisensyService
             'templateParams' => $templateParams,
         ];
 
+        Log::info('AIsensy request', [
+            'url' => $url,
+            'campaignName' => $campaignName,
+            'destination' => $phone,
+            'userName' => $userName,
+            'templateParams' => $templateParams,
+        ]);
+
         try {
             $response = Http::withHeaders([
                 'Content-Type' => 'application/json',
             ])->post($url, $payload);
 
             $data = $response->json();
+
+            Log::info('AIsensy response', [
+                'http_status' => $response->status(),
+                'body' => $data,
+            ]);
 
             if ($response->successful()) {
                 return ['status' => 'success', 'response' => $data];
@@ -64,6 +78,8 @@ class AisensyService
                 'response' => $data,
             ];
         } catch (\Throwable $e) {
+            Log::error('AIsensy exception', ['error' => $e->getMessage()]);
+
             return [
                 'status' => 'failed',
                 'error' => $e->getMessage(),

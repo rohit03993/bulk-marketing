@@ -14,6 +14,7 @@ class StudentCall extends Model
         'user_id',
         'call_status',
         'call_direction',
+        'whatsapp_auto_status',
         'who_answered',
         'duration_minutes',
         'call_notes',

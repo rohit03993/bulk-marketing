@@ -241,6 +241,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('staff/{staff}/edit', [StaffController::class, 'edit'])->name('staff.edit');
         Route::patch('staff/{staff}', [StaffController::class, 'update'])->name('staff.update');
         Route::post('staff/{staff}/revoke-students', [StaffController::class, 'revokeStudents'])->name('staff.revoke-students');
+        Route::get('settings/postcall-whatsapp', [\App\Http\Controllers\AdminSettingsController::class, 'postcallWhatsapp'])->name('settings.postcall-whatsapp');
+        Route::post('settings/postcall-whatsapp', [\App\Http\Controllers\AdminSettingsController::class, 'postcallWhatsappUpdate'])->name('settings.postcall-whatsapp.update');
         Route::get('reset-data', [DataResetController::class, 'showResetForm'])->name('reset-data');
         Route::post('reset-data', [DataResetController::class, 'reset'])->name('reset-data.perform');
         Route::get('/', function () {
