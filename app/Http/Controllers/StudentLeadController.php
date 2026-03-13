@@ -56,6 +56,9 @@ class StudentLeadController extends Controller
         $upcomingDays = 14; // show upcoming follow-ups for the next N days
         $upcomingUntil = $endOfToday->copy()->addDays($upcomingDays);
 
+        // Only these lead statuses participate in the follow-up loop.
+        $followupLeadStatuses = ['interested', 'follow_up_later'];
+
         $notConnectedStatuses = [
             StudentCall::STATUS_NO_ANSWER,
             StudentCall::STATUS_BUSY,
@@ -79,6 +82,7 @@ class StudentLeadController extends Controller
         // Due or overdue follow-ups (today and earlier)
         $dueQuery = Student::with(['classSection.school'])
             ->where('assigned_to', $user->id)
+            ->whereIn('lead_status', $followupLeadStatuses)
             ->whereNotNull('next_followup_at')
             ->where('next_followup_at', '<=', $endOfToday)
             ->when(! empty($notConnectedIds), fn ($q) => $q->whereNotIn('id', $notConnectedIds))
@@ -86,7 +90,10 @@ class StudentLeadController extends Controller
             ->orderBy('name');
 
         if ($request->filled('status') && $request->status !== 'all') {
-            $dueQuery->where('lead_status', $request->status);
+            // Allow narrowing within the follow-up statuses only.
+            if (in_array($request->status, $followupLeadStatuses, true)) {
+                $dueQuery->where('lead_status', $request->status);
+            }
         }
 
         $dueStudents = $dueQuery->paginate(15)->withQueryString();
@@ -94,6 +101,7 @@ class StudentLeadController extends Controller
         // Upcoming follow-ups in the next N days (excluding today)
         $upcomingQuery = Student::with(['classSection.school'])
             ->where('assigned_to', $user->id)
+            ->whereIn('lead_status', $followupLeadStatuses)
             ->whereNotNull('next_followup_at')
             ->whereBetween('next_followup_at', [$endOfToday->copy()->addSecond(), $upcomingUntil])
             ->when(! empty($notConnectedIds), fn ($q) => $q->whereNotIn('id', $notConnectedIds))
@@ -101,7 +109,9 @@ class StudentLeadController extends Controller
             ->orderBy('name');
 
         if ($request->filled('status') && $request->status !== 'all') {
-            $upcomingQuery->where('lead_status', $request->status);
+            if (in_array($request->status, $followupLeadStatuses, true)) {
+                $upcomingQuery->where('lead_status', $request->status);
+            }
         }
 
         $upcomingStudents = $upcomingQuery->take(50)->get();

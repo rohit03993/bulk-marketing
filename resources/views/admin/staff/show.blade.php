@@ -113,14 +113,28 @@
                     <div class="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-blue-500/15 to-transparent rounded-bl-full"></div>
                     <p class="text-xs font-medium text-blue-600">{{ __('Students assigned') }}</p>
                     <p class="mt-2 text-3xl font-extrabold text-blue-700">
-                        {{ $students->count() }}
+                        {{ $assignedTotal ?? $students->total() }}
+                    </p>
+                    <p class="mt-1 text-xs text-slate-500">
+                        {{ __('Converted:') }}
+                        <span class="font-semibold text-emerald-700">
+                            {{ ($convertedWalkin + $convertedAdmission) }}
+                        </span>
+                        · {{ __('Exited:') }}
+                        <span class="font-semibold text-rose-700">
+                            {{ $exitedNotInterested }}
+                        </span>
                     </p>
                 </div>
                 <div class="bg-white rounded-2xl shadow-lg shadow-indigo-100/40 border border-indigo-100 p-5 overflow-hidden relative">
                     <div class="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-indigo-400/20 to-transparent rounded-bl-full"></div>
-                    <p class="text-xs font-medium text-indigo-600">{{ __('Messages sent (campaigns)') }}</p>
+                    <p class="text-xs font-medium text-indigo-600">{{ __('Converted') }}</p>
                     <p class="mt-2 text-3xl font-extrabold text-indigo-700">
-                        {{ $messagesSent }}
+                        {{ ($convertedWalkin + $convertedAdmission) }}
+                    </p>
+                    <p class="mt-1 text-xs text-slate-500">
+                        {{ __('Walk-ins:') }} <span class="font-semibold text-slate-700">{{ $convertedWalkin }}</span>
+                        · {{ __('Admissions:') }} <span class="font-semibold text-slate-700">{{ $convertedAdmission }}</span>
                     </p>
                 </div>
             </div>
@@ -250,9 +264,9 @@
                             <span x-text="selectAll ? '{{ __('Deselect all') }}' : '{{ __('Select all uncalled') }}'"></span>
                         </button>
                     @endif
-                    @if (($totalUncalled ?? 0) > 0)
+                    @if (($totalUncalled ?? 0) > 0 && request('school_id') && request('class_section_id'))
                         <form method="POST" action="{{ route('admin.staff.revoke-students', $staff) }}"
-                              onsubmit="return confirm('{{ __('Revoke ALL uncalled students matching current filters (all pages)?') }}')">
+                              onsubmit="return confirm('{{ __('Revoke ALL uncalled students for this School/Class (all pages)? This cannot be undone.') }}')">
                             @csrf
                             <input type="hidden" name="select_all_filtered" value="1">
                             @if ($filterLeadStatus)

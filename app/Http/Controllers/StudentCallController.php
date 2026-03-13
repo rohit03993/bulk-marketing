@@ -16,6 +16,23 @@ class StudentCallController extends Controller
 {
     private const LEAD_STATUSES = ['lead', 'interested', 'not_interested', 'walkin_done', 'admission_done', 'follow_up_later'];
 
+    private const FOLLOWUP_LEAD_STATUSES = ['interested', 'follow_up_later'];
+
+    private const TERMINAL_LEAD_STATUSES = ['not_interested', 'admission_done'];
+
+    private const NOT_CONNECTED_STATUSES = [
+        StudentCall::STATUS_NO_ANSWER,
+        StudentCall::STATUS_BUSY,
+        StudentCall::STATUS_SWITCHED_OFF,
+        StudentCall::STATUS_NOT_REACHABLE,
+        StudentCall::STATUS_WRONG_NUMBER,
+        StudentCall::STATUS_CALLBACK,
+    ];
+
+    private const MAX_NOT_CONNECTED_ATTEMPTS = 3; // within the lookback window
+
+    private const NOT_CONNECTED_LOOKBACK_DAYS = 7;
+
     /**
      * Store a new call against a student. Supports both legacy form and Log Call Result wizard.
      */
@@ -47,9 +64,10 @@ class StudentCallController extends Controller
             $data = $request->validate($rules);
 
             $callStatus = $request->boolean('call_connected') ? StudentCall::STATUS_CONNECTED : $data['call_status'];
-            $newLeadStatus = $request->boolean('call_connected') ? $data['lead_status'] : ($data['call_status'] === 'wrong_number' ? 'not_interested' : 'lead');
-            $skipFollowup = in_array($newLeadStatus, ['not_interested', 'admission_done'], true);
-            if (! $skipFollowup && empty($data['next_followup_at'])) {
+            $newLeadStatus = $request->boolean('call_connected') ? $data['lead_status'] : ($data['call_status'] === 'wrong_number' ? 'not_interested' : ($student->lead_status ?? 'lead'));
+
+            $skipFollowup = in_array($newLeadStatus, self::TERMINAL_LEAD_STATUSES, true);
+            if (! $skipFollowup && empty($data['next_followup_at']) && in_array($newLeadStatus, self::FOLLOWUP_LEAD_STATUSES, true)) {
                 $request->validate(['next_followup_at' => 'required|date|after:now'], [], ['next_followup_at' => __('Follow-up date')]);
             }
         } else {
@@ -78,12 +96,18 @@ class StudentCallController extends Controller
             $call->who_answered = $data['who_answered'];
             $call->tags = $request->input('tags', []);
         }
-        if (! empty($data['next_followup_at'])) {
-            $call->next_followup_at = Carbon::parse($data['next_followup_at']);
-        } elseif (! $wizard) {
-            $call->next_followup_at = $this->computeNextFollowupAt($callStatus);
-        }
         $call->called_at = Carbon::now();
+
+        // Decide next follow-up based on smarter rules.
+        $call->next_followup_at = $this->determineNextFollowupAt(
+            $student,
+            $user,
+            $callStatus,
+            $newLeadStatus,
+            $data,
+            $wizard
+        );
+
         $call->save();
 
         $student->total_calls = (int) $student->total_calls + 1;
@@ -147,6 +171,71 @@ class StudentCallController extends Controller
                 ? __('Today') . ', ' . $suggested->format('h:i A')
                 : $suggested->format('d M, h:i A'),
         ]);
+    }
+
+    /**
+     * Decide the next_followup_at for a new call, without changing existing data.
+     *
+     * Rules:
+     * - Only leads in FOLLOWUP_LEAD_STATUSES get a future follow-up.
+     * - Terminal lead statuses never get a follow-up.
+     * - Not-connected calls schedule follow-up only up to MAX_NOT_CONNECTED_ATTEMPTS
+     *   within NOT_CONNECTED_LOOKBACK_DAYS for this telecaller + student.
+     */
+    protected function determineNextFollowupAt(
+        Student $student,
+        $user,
+        string $callStatus,
+        ?string $newLeadStatus,
+        array $data,
+        bool $wizard
+    ): ?Carbon {
+        $now = Carbon::now();
+
+        // Terminal lead statuses: stop follow-ups.
+        if ($newLeadStatus && in_array($newLeadStatus, self::TERMINAL_LEAD_STATUSES, true)) {
+            return null;
+        }
+
+        // Connected + interested / follow_up_later: honour provided follow-up.
+        if ($callStatus === StudentCall::STATUS_CONNECTED && $newLeadStatus && in_array($newLeadStatus, self::FOLLOWUP_LEAD_STATUSES, true)) {
+            if (! empty($data['next_followup_at'])) {
+                return Carbon::parse($data['next_followup_at']);
+            }
+
+            // If somehow missing (non-wizard), fall back to a safe default: tomorrow 10 AM.
+            return $now->copy()->addDay()->setHour(10)->setMinute(0)->setSecond(0);
+        }
+
+        // Not-connected: only schedule while attempts are under the cap.
+        if (in_array($callStatus, self::NOT_CONNECTED_STATUSES, true)) {
+            $lookbackFrom = $now->copy()->subDays(self::NOT_CONNECTED_LOOKBACK_DAYS);
+
+            $failedAttempts = StudentCall::where('student_id', $student->id)
+                ->where('user_id', $user->id)
+                ->whereIn('call_status', self::NOT_CONNECTED_STATUSES)
+                ->whereBetween('called_at', [$lookbackFrom, $now])
+                ->count();
+
+            if ($failedAttempts >= self::MAX_NOT_CONNECTED_ATTEMPTS) {
+                // Too many failures already: do not auto-schedule more follow-ups.
+                return null;
+            }
+
+            if (! empty($data['next_followup_at'])) {
+                return Carbon::parse($data['next_followup_at']);
+            }
+
+            // Fall back to existing simple defaults.
+            return $this->computeNextFollowupAt($callStatus);
+        }
+
+        // Legacy / manual path: if non-wizard and they explicitly provided a follow-up, honour it.
+        if (! $wizard && ! empty($data['next_followup_at'])) {
+            return Carbon::parse($data['next_followup_at']);
+        }
+
+        return null;
     }
 
     protected function firePostCallWhatsApp(StudentCall $call, Student $student, $user): void

@@ -109,21 +109,34 @@ Route::middleware(['auth', 'verified'])->group(function () {
         $upcomingUntil = $endOfToday->copy()->addDays($upcomingDays);
 
         $myLeadsQuery = \App\Models\Student::where('assigned_to', $userId);
+
+        // Follow-up pool is strictly these lead statuses.
+        $followupLeadStatuses = ['interested', 'follow_up_later'];
+
+        $assignedLeads = (clone $myLeadsQuery)->count();
+        $leadWalkin = (clone $myLeadsQuery)->where('lead_status', 'walkin_done')->count();
+        $leadAdmission = (clone $myLeadsQuery)->where('lead_status', 'admission_done')->count();
+        $leadNotInterested = (clone $myLeadsQuery)->where('lead_status', 'not_interested')->count();
+
+        $followupBase = (clone $myLeadsQuery)
+            ->whereIn('lead_status', $followupLeadStatuses)
+            ->whereNotNull('next_followup_at');
+
         $stats = [
-            'assigned_leads' => (clone $myLeadsQuery)->count(),
+            'assigned_leads' => $assignedLeads,
             'lead_new' => (clone $myLeadsQuery)->where('lead_status', 'lead')->where('total_calls', 0)->count(),
             'total_calls_ever' => \App\Models\StudentCall::where('user_id', $userId)->count(),
             'lead_interested' => (clone $myLeadsQuery)->where('lead_status', 'interested')->count(),
             'lead_followup_later' => (clone $myLeadsQuery)->where('lead_status', 'follow_up_later')->count(),
-            'lead_walkin_done' => (clone $myLeadsQuery)->where('lead_status', 'walkin_done')->count(),
-            'lead_admission_done' => (clone $myLeadsQuery)->where('lead_status', 'admission_done')->count(),
-            'lead_not_interested' => (clone $myLeadsQuery)->where('lead_status', 'not_interested')->count(),
-            'followups_window' => (clone $myLeadsQuery)
-                ->whereNotNull('next_followup_at')
+            'lead_walkin_done' => $leadWalkin,
+            'lead_admission_done' => $leadAdmission,
+            'lead_not_interested' => $leadNotInterested,
+            // All active follow-ups in the upcoming window (interested / follow_up_later only)
+            'followups_window' => (clone $followupBase)
                 ->where('next_followup_at', '<=', $upcomingUntil)
                 ->count(),
-            'overdue_followups' => (clone $myLeadsQuery)
-                ->whereNotNull('next_followup_at')
+            // Overdue follow-ups (same pool)
+            'overdue_followups' => (clone $followupBase)
                 ->whereDate('next_followup_at', '<', $today)
                 ->count(),
             'calls_today' => \App\Models\StudentCall::where('user_id', $userId)

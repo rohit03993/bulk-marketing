@@ -6,20 +6,24 @@
     $now = now();
     $endOfToday = $now->copy()->endOfDay();
 
-    $overdueCount = \App\Models\Student::where('assigned_to', $userId)
-        ->whereNotNull('next_followup_at')
+    // Only treat these lead statuses as active follow-ups.
+    $followupLeadStatuses = ['interested', 'follow_up_later'];
+
+    $baseFollowupQuery = \App\Models\Student::where('assigned_to', $userId)
+        ->whereIn('lead_status', $followupLeadStatuses)
+        ->whereNotNull('next_followup_at');
+
+    $overdueCount = (clone $baseFollowupQuery)
         ->where('next_followup_at', '<', $now)
         ->count();
 
-    $dueTodayCount = \App\Models\Student::where('assigned_to', $userId)
-        ->whereNotNull('next_followup_at')
+    $dueTodayCount = (clone $baseFollowupQuery)
         ->whereBetween('next_followup_at', [$now, $endOfToday])
         ->count();
 
     $totalDue = $overdueCount + $dueTodayCount;
 
-    $dueNextHour = \App\Models\Student::where('assigned_to', $userId)
-        ->whereNotNull('next_followup_at')
+    $dueNextHour = (clone $baseFollowupQuery)
         ->whereBetween('next_followup_at', [$now, $now->copy()->addHour()])
         ->count();
 @endphp

@@ -142,6 +142,18 @@ class StaffController extends Controller
             'follow_up_later' => __('Follow-up Later'),
         ];
 
+        // Lifetime stats for this telecaller (not affected by filters).
+        $assignedTotal = Student::where('assigned_to', $staff->id)->count();
+        $convertedWalkin = Student::where('assigned_to', $staff->id)
+            ->where('lead_status', 'walkin_done')
+            ->count();
+        $convertedAdmission = Student::where('assigned_to', $staff->id)
+            ->where('lead_status', 'admission_done')
+            ->count();
+        $exitedNotInterested = Student::where('assigned_to', $staff->id)
+            ->where('lead_status', 'not_interested')
+            ->count();
+
         $schools = School::orderBy('name')->get();
         $classSections = collect();
         if ($filterSchoolId) {
@@ -168,6 +180,10 @@ class StaffController extends Controller
             'totalUncalled' => $totalUncalled,
             'campaigns' => $campaigns,
             'messagesSent' => $messagesSent,
+            'assignedTotal' => $assignedTotal,
+            'convertedWalkin' => $convertedWalkin,
+            'convertedAdmission' => $convertedAdmission,
+            'exitedNotInterested' => $exitedNotInterested,
             'filterFrom' => $filterFrom?->toDateString(),
             'filterTo' => $filterTo?->toDateString(),
             'filterLeadStatus' => $filterLeadStatus,
@@ -258,6 +274,12 @@ class StaffController extends Controller
         }
 
         if ($request->boolean('select_all_filtered')) {
+            // Extra safety: only allow bulk revoke when scoped to a specific school + class.
+            if (! $request->filled('school_id') || ! $request->filled('class_section_id')) {
+                return redirect()->route('admin.staff.show', $staff)
+                    ->with('error', __('Please select a School and Class before revoking all uncalled students.'));
+            }
+
             $targetIds = $baseQuery->pluck('id')->all();
         } else {
             $targetIds = $data['student_ids'] ?? [];
