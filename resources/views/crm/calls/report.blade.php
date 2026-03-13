@@ -188,8 +188,19 @@
                         </tbody>
                     </table>
                 </div>
-                <div class="px-4 py-3 border-t border-slate-200">
-                    {{ $calls->links() }}
+                <div class="px-4 py-4 border-t border-slate-200 bg-slate-50/50 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                    <p class="text-sm text-slate-600">
+                        {{ __('Showing') }}
+                        <span class="font-semibold text-slate-800">{{ $calls->firstItem() ?? 0 }}</span>
+                        {{ __('to') }}
+                        <span class="font-semibold text-slate-800">{{ $calls->lastItem() ?? 0 }}</span>
+                        {{ __('of') }}
+                        <span class="font-semibold text-slate-800">{{ $calls->total() }}</span>
+                        {{ __('calls') }}
+                    </p>
+                    <div class="flex flex-wrap justify-end">
+                        {{ $calls->withQueryString()->links() }}
+                    </div>
                 </div>
             </div>
         </div>

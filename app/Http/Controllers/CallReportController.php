@@ -65,7 +65,7 @@ class CallReportController extends Controller
             });
         }
 
-        $calls = $query->paginate(30)->withQueryString();
+        $calls = $query->paginate(10)->withQueryString();
 
         // Summary counts (same filters, without pagination)
         $base = clone $query;

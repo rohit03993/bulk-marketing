@@ -11,10 +11,13 @@ use App\Services\TelecallerScoreService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rules\Password;
+use Illuminate\Support\Carbon;
 
 class StaffController extends Controller
 {
-    public function show(User $staff)
+    private const LEAD_STATUSES = ['lead', 'interested', 'not_interested', 'walkin_done', 'admission_done', 'follow_up_later'];
+
+    public function show(Request $request, User $staff)
     {
         abort_if($staff->isAdmin(), 404);
 
@@ -29,11 +32,11 @@ class StaffController extends Controller
         $callsQuery = StudentCall::with(['student.classSection.school'])
             ->where('user_id', $staff->id)
             ->orderByDesc('called_at');
-        $recentCalls = (clone $callsQuery)->limit(20)->get();
+
+        $recentCallsQuery = (clone $callsQuery);
 
         $callsTotal = (clone $callsQuery)->count();
         $callsConnected = (clone $callsQuery)->where('call_status', StudentCall::STATUS_CONNECTED)->count();
-
         $notConnectedStatuses = [
             StudentCall::STATUS_NO_ANSWER,
             StudentCall::STATUS_BUSY,
@@ -44,10 +47,58 @@ class StaffController extends Controller
         ];
         $callsNotConnected = (clone $callsQuery)->whereIn('call_status', $notConnectedStatuses)->count();
 
-        $students = Student::with(['classSection.school'])
-            ->where('assigned_to', $staff->id)
-            ->orderBy('name')
+        $filterFrom = $request->has('from_date') ? Carbon::parse($request->input('from_date'))->startOfDay() : null;
+        $filterTo = $request->has('to_date') ? Carbon::parse($request->input('to_date'))->endOfDay() : null;
+        $filterLeadStatus = $request->filled('lead_status') && in_array($request->input('lead_status'), self::LEAD_STATUSES, true)
+            ? $request->input('lead_status')
+            : null;
+
+        if ($filterFrom && $filterTo && $filterFrom->lte($filterTo)) {
+            $recentCallsQuery->whereBetween('called_at', [$filterFrom, $filterTo]);
+        }
+        $recentCalls = $recentCallsQuery->paginate(10, ['*'], 'calls_page')->withQueryString();
+
+        $callsSummaryFiltered = null;
+        $dailyStats = [];
+
+        $rangeStart = $filterFrom ?? now()->subDays(29)->startOfDay();
+        $rangeEnd = $filterTo ?? now()->endOfDay();
+        if ($rangeStart->gt($rangeEnd)) {
+            $rangeEnd = $rangeStart->copy()->endOfDay();
+        }
+
+        $callsInRange = StudentCall::where('user_id', $staff->id)
+            ->whereBetween('called_at', [$rangeStart, $rangeEnd])
             ->get();
+
+        if ($filterFrom && $filterTo && $filterFrom->lte($filterTo)) {
+            $callsSummaryFiltered = [
+                'total' => $callsInRange->count(),
+                'connected' => $callsInRange->where('call_status', StudentCall::STATUS_CONNECTED)->count(),
+                'not_connected' => $callsInRange->whereIn('call_status', $notConnectedStatuses)->count(),
+            ];
+        }
+
+        $byDay = $callsInRange->groupBy(fn ($c) => Carbon::parse($c->called_at)->toDateString());
+        $dates = $byDay->keys()->sort()->values();
+        foreach ($dates as $dateStr) {
+            $dayCalls = $byDay[$dateStr];
+            $dailyStats[] = [
+                'date' => $dateStr,
+                'total' => $dayCalls->count(),
+                'connected' => $dayCalls->where('call_status', StudentCall::STATUS_CONNECTED)->count(),
+                'not_connected' => $dayCalls->whereIn('call_status', $notConnectedStatuses)->count(),
+            ];
+        }
+        usort($dailyStats, fn ($a, $b) => strcmp($b['date'], $a['date']));
+
+        $studentsQuery = Student::with(['classSection.school'])
+            ->where('assigned_to', $staff->id)
+            ->orderBy('name');
+        if ($filterLeadStatus !== null) {
+            $studentsQuery->where('lead_status', $filterLeadStatus);
+        }
+        $students = $studentsQuery->get();
 
         $studentIds = $students->pluck('id')->all();
         $callCountsByStudent = StudentCall::where('user_id', $staff->id)
@@ -60,12 +111,21 @@ class StaffController extends Controller
         $campaigns = Campaign::with(['school', 'template'])
             ->where('shot_by', $staff->id)
             ->orderByDesc('created_at')
-            ->limit(10)
-            ->get();
+            ->paginate(5, ['*'], 'campaigns_page')
+            ->withQueryString();
 
         $messagesSent = CampaignRecipient::where('status', 'sent')
             ->whereHas('campaign', fn ($q) => $q->where('shot_by', $staff->id))
             ->count();
+
+        $leadStatusOptions = [
+            'lead' => __('Uncalled'),
+            'interested' => __('Interested'),
+            'not_interested' => __('Not Interested'),
+            'walkin_done' => __('Walk-in Done'),
+            'admission_done' => __('Admission Done'),
+            'follow_up_later' => __('Follow-up Later'),
+        ];
 
         return view('admin.staff.show', [
             'staff' => $staff,
@@ -76,11 +136,17 @@ class StaffController extends Controller
                 'connected' => $callsConnected,
                 'not_connected' => $callsNotConnected,
             ],
+            'callsSummaryFiltered' => $callsSummaryFiltered,
+            'dailyStats' => $dailyStats,
             'recentCalls' => $recentCalls,
             'students' => $students,
             'callCountsByStudent' => $callCountsByStudent,
             'campaigns' => $campaigns,
             'messagesSent' => $messagesSent,
+            'filterFrom' => $filterFrom?->toDateString(),
+            'filterTo' => $filterTo?->toDateString(),
+            'filterLeadStatus' => $filterLeadStatus,
+            'leadStatusOptions' => $leadStatusOptions,
         ]);
     }
 
