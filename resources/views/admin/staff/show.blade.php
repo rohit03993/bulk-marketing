@@ -53,6 +53,28 @@
                             @endforeach
                         </select>
                     </div>
+                    <div>
+                        <label for="school_id" class="block text-xs font-medium text-blue-700">{{ __('School') }}</label>
+                        <select id="school_id" name="school_id" class="mt-1 block w-full rounded-lg border-blue-200 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500 text-slate-700">
+                            <option value="">{{ __('All') }}</option>
+                            @foreach ($schools ?? [] as $school)
+                                <option value="{{ $school->id }}" {{ (request('school_id') == $school->id) ? 'selected' : '' }}>
+                                    {{ $school->name }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div>
+                        <label for="class_section_id" class="block text-xs font-medium text-blue-700">{{ __('Class / Section') }}</label>
+                        <select id="class_section_id" name="class_section_id" class="mt-1 block w-full rounded-lg border-blue-200 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500 text-slate-700">
+                            <option value="">{{ __('All') }}</option>
+                            @foreach ($classSections ?? [] as $cs)
+                                <option value="{{ $cs->id }}" {{ (request('class_section_id') == $cs->id) ? 'selected' : '' }}>
+                                    {{ $cs->full_name ?? ($cs->class_name . ' ' . $cs->section_name) }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
                     <button type="submit" class="inline-flex items-center px-4 py-2 rounded-lg text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 shadow-md shadow-blue-200/50 transition">
                         {{ __('Apply') }}
                     </button>
@@ -227,6 +249,26 @@
                                 class="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 transition">
                             <span x-text="selectAll ? '{{ __('Deselect all') }}' : '{{ __('Select all uncalled') }}'"></span>
                         </button>
+                    @endif
+                    @if (($totalUncalled ?? 0) > 0)
+                        <form method="POST" action="{{ route('admin.staff.revoke-students', $staff) }}"
+                              onsubmit="return confirm('{{ __('Revoke ALL uncalled students matching current filters (all pages)?') }}')">
+                            @csrf
+                            <input type="hidden" name="select_all_filtered" value="1">
+                            @if ($filterLeadStatus)
+                                <input type="hidden" name="lead_status" value="{{ $filterLeadStatus }}">
+                            @endif
+                            @if (request('school_id'))
+                                <input type="hidden" name="school_id" value="{{ request('school_id') }}">
+                            @endif
+                            @if (request('class_section_id'))
+                                <input type="hidden" name="class_section_id" value="{{ request('class_section_id') }}">
+                            @endif
+                            <button type="submit"
+                                    class="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-rose-600 hover:bg-rose-700 transition">
+                                {{ __('Revoke ALL uncalled (all pages)') }}
+                            </button>
+                        </form>
                     @endif
                 </div>
                 <div class="overflow-x-auto rounded-xl border border-blue-100 overflow-hidden">

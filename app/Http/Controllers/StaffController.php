@@ -7,6 +7,8 @@ use App\Models\Student;
 use App\Models\StudentCall;
 use App\Models\Campaign;
 use App\Models\CampaignRecipient;
+use App\Models\School;
+use App\Models\ClassSection;
 use App\Services\TelecallerScoreService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -52,6 +54,8 @@ class StaffController extends Controller
         $filterLeadStatus = $request->filled('lead_status') && in_array($request->input('lead_status'), self::LEAD_STATUSES, true)
             ? $request->input('lead_status')
             : null;
+        $filterSchoolId = $request->input('school_id');
+        $filterClassSectionId = $request->input('class_section_id');
 
         if ($filterFrom && $filterTo && $filterFrom->lte($filterTo)) {
             $recentCallsQuery->whereBetween('called_at', [$filterFrom, $filterTo]);
@@ -98,6 +102,14 @@ class StaffController extends Controller
         if ($filterLeadStatus !== null) {
             $studentsQuery->where('lead_status', $filterLeadStatus);
         }
+        if ($filterSchoolId) {
+            $studentsQuery->whereHas('classSection', function ($q) use ($filterSchoolId) {
+                $q->where('school_id', $filterSchoolId);
+            });
+        }
+        if ($filterClassSectionId) {
+            $studentsQuery->where('class_section_id', $filterClassSectionId);
+        }
 
         $allAssignedIds = (clone $studentsQuery)->pluck('id');
         $callCountsByStudent = StudentCall::where('user_id', $staff->id)
@@ -130,6 +142,15 @@ class StaffController extends Controller
             'follow_up_later' => __('Follow-up Later'),
         ];
 
+        $schools = School::orderBy('name')->get();
+        $classSections = collect();
+        if ($filterSchoolId) {
+            $classSections = ClassSection::where('school_id', $filterSchoolId)
+                ->orderBy('class_name')
+                ->orderBy('section_name')
+                ->get();
+        }
+
         return view('admin.staff.show', [
             'staff' => $staff,
             'scoreToday' => $scoreToday,
@@ -151,6 +172,8 @@ class StaffController extends Controller
             'filterTo' => $filterTo?->toDateString(),
             'filterLeadStatus' => $filterLeadStatus,
             'leadStatusOptions' => $leadStatusOptions,
+            'schools' => $schools,
+            'classSections' => $classSections,
         ]);
     }
 
@@ -211,12 +234,41 @@ class StaffController extends Controller
         abort_if($staff->isAdmin(), 404);
 
         $data = $request->validate([
-            'student_ids' => 'required|array|min:1',
+            'student_ids' => 'array',
             'student_ids.*' => 'integer|exists:students,id',
+            'select_all_filtered' => 'nullable|boolean',
         ]);
 
         $revoked = 0;
-        foreach ($data['student_ids'] as $studentId) {
+
+        $baseQuery = Student::where('assigned_to', $staff->id);
+
+        // Re-apply filters from the staff detail page so "all filtered" mode is consistent.
+        if ($request->filled('lead_status') && in_array($request->input('lead_status'), self::LEAD_STATUSES, true)) {
+            $baseQuery->where('lead_status', $request->input('lead_status'));
+        }
+        if ($request->filled('school_id')) {
+            $schoolId = $request->input('school_id');
+            $baseQuery->whereHas('classSection', function ($q) use ($schoolId) {
+                $q->where('school_id', $schoolId);
+            });
+        }
+        if ($request->filled('class_section_id')) {
+            $baseQuery->where('class_section_id', $request->input('class_section_id'));
+        }
+
+        if ($request->boolean('select_all_filtered')) {
+            $targetIds = $baseQuery->pluck('id')->all();
+        } else {
+            $targetIds = $data['student_ids'] ?? [];
+        }
+
+        if (empty($targetIds)) {
+            return redirect()->route('admin.staff.show', $staff)
+                ->with('success', __('No students matched the selected filters.'));
+        }
+
+        foreach ($targetIds as $studentId) {
             $student = Student::where('id', $studentId)
                 ->where('assigned_to', $staff->id)
                 ->first();
