@@ -199,18 +199,18 @@
             {{-- Students under this telecaller --}}
             @php
                 $uncalledStudentIds = $students->filter(fn ($s) => empty($callCountsByStudent[$s->id] ?? 0))->pluck('id')->all();
-                $uncalledCount = count($uncalledStudentIds);
+                $uncalledCountOnPage = count($uncalledStudentIds);
             @endphp
             <div class="bg-white rounded-2xl shadow-lg shadow-blue-100/50 border border-blue-100 p-5" x-data="{ selectedIds: [], selectAll: false }">
                 <div class="flex items-center gap-2 mb-4">
                     <span class="flex h-8 w-1 rounded-full bg-blue-500"></span>
                     <div>
                         <p class="text-sm font-semibold text-blue-900">{{ __('Students under this telecaller') }}</p>
-                        <p class="text-xs text-slate-500">{{ $students->count() }} {{ __('assigned') }} · {{ $uncalledCount }} {{ __('not called (revocable)') }}</p>
+                        <p class="text-xs text-slate-500">{{ $students->total() }} {{ __('assigned') }} · {{ $totalUncalled ?? 0 }} {{ __('not called (revocable)') }}</p>
                     </div>
                 </div>
                 <div class="flex flex-wrap items-center justify-end gap-2 mb-4">
-                    @if ($uncalledCount > 0)
+                    @if ($uncalledCountOnPage > 0)
                         <form method="POST" action="{{ route('admin.staff.revoke-students', $staff) }}" id="revokeForm"
                               onsubmit="return confirm('{{ __('Revoke selected students? They will become unassigned.') }}')">
                             @csrf
@@ -233,7 +233,7 @@
                     <table class="min-w-full divide-y divide-blue-100 text-sm">
                         <thead class="bg-gradient-to-r from-blue-50 to-sky-50">
                             <tr>
-                                @if ($uncalledCount > 0)
+                                @if ($uncalledCountOnPage > 0)
                                     <th class="px-3 py-3 w-8"></th>
                                 @endif
                                 <th class="px-4 py-3 text-left font-semibold text-blue-800">{{ __('Student') }}</th>
@@ -250,7 +250,7 @@
                                     $canRevoke = $staffCalls === 0;
                                 @endphp
                                 <tr class="hover:bg-blue-50/30 transition {{ $canRevoke ? 'bg-amber-50/50' : '' }}">
-                                    @if ($uncalledCount > 0)
+                                    @if ($uncalledCountOnPage > 0)
                                         <td class="px-3 py-3 text-center">
                                             @if ($canRevoke)
                                                 <input type="checkbox" value="{{ $student->id }}"
@@ -302,6 +302,14 @@
                         </tbody>
                     </table>
                 </div>
+                @if ($students->hasPages())
+                    <div class="px-4 py-3 border-t border-blue-100 bg-blue-50/40 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-sm">
+                        <p class="text-slate-600">
+                            {{ __('Showing') }} <span class="font-semibold">{{ $students->firstItem() ?? 0 }}</span> {{ __('to') }} <span class="font-semibold">{{ $students->lastItem() ?? 0 }}</span> {{ __('of') }} <span class="font-semibold">{{ $students->total() }}</span> {{ __('students') }}
+                        </p>
+                        <div>{{ $students->links() }}</div>
+                    </div>
+                @endif
             </div>
 
             {{-- Recent calls and campaigns --}}

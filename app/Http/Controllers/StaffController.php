@@ -98,15 +98,18 @@ class StaffController extends Controller
         if ($filterLeadStatus !== null) {
             $studentsQuery->where('lead_status', $filterLeadStatus);
         }
-        $students = $studentsQuery->get();
 
-        $studentIds = $students->pluck('id')->all();
+        $allAssignedIds = (clone $studentsQuery)->pluck('id');
         $callCountsByStudent = StudentCall::where('user_id', $staff->id)
-            ->whereIn('student_id', $studentIds)
+            ->whereIn('student_id', $allAssignedIds)
             ->selectRaw('student_id, count(*) as cnt')
             ->groupBy('student_id')
             ->pluck('cnt', 'student_id')
             ->all();
+
+        $totalUncalled = $allAssignedIds->filter(fn ($id) => empty($callCountsByStudent[$id] ?? 0))->count();
+
+        $students = $studentsQuery->paginate(10, ['*'], 'students_page')->withQueryString();
 
         $campaigns = Campaign::with(['school', 'template'])
             ->where('shot_by', $staff->id)
@@ -141,6 +144,7 @@ class StaffController extends Controller
             'recentCalls' => $recentCalls,
             'students' => $students,
             'callCountsByStudent' => $callCountsByStudent,
+            'totalUncalled' => $totalUncalled,
             'campaigns' => $campaigns,
             'messagesSent' => $messagesSent,
             'filterFrom' => $filterFrom?->toDateString(),
