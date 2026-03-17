@@ -90,12 +90,18 @@ class CallQueueController extends Controller
     private function getTodayQueue($user): \Illuminate\Support\Collection
     {
         $today = Carbon::today();
+        $endOfToday = $today->copy()->endOfDay();
         $now = now();
 
         $query = Student::with(['classSection.school'])
             ->where('assigned_to', $user->id)
             ->whereNotIn('lead_status', ['admission_done', 'not_interested'])
             ->whereNotIn('id', $this->studentIdsExcludedByNotConnectedCap($user));
+
+        // Never include future follow-ups (tomorrow/next days) in today's queue.
+        $query->where(function ($q) use ($endOfToday) {
+            $q->whereNull('next_followup_at')->orWhere('next_followup_at', '<=', $endOfToday);
+        });
 
         $query->where(function ($q) use ($today, $now) {
             $q->where('total_calls', 0)

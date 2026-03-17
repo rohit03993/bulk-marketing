@@ -73,9 +73,9 @@
                                 <a id="currentLeadNameLink" href="{{ route('students.show', $current) }}" class="hover:text-indigo-700">
                                     <h3 class="text-xl font-bold text-gray-900" id="currentLeadName">{{ $current->name }}</h3>
                                 </a>
-                                @if($current->father_name)
-                                    <p class="text-sm text-gray-500">{{ __('S/o') }} {{ $current->father_name }}</p>
-                                @endif
+                                <p class="text-sm text-gray-500" id="currentLeadFather" style="{{ $current->father_name ? '' : 'display:none' }}">
+                                    {{ __('S/o') }} <span id="currentLeadFatherName">{{ $current->father_name }}</span>
+                                </p>
                                 <p class="mt-2 text-lg font-semibold text-emerald-600" id="currentLeadPhone">
                                     @if($phoneDisplay)
                                         <a href="tel:{{ $phone }}" class="inline-flex items-center gap-1">{{ $phoneDisplay }}</a>
@@ -86,14 +86,15 @@
                                 <div class="mt-4 flex flex-wrap gap-2">
                                     <span class="inline-flex px-2 py-1 rounded-full text-xs font-medium bg-sky-100 text-sky-800" id="currentLeadStatus">{{ $statusLabel }}</span>
                                     <span class="text-sm text-gray-600">{{ __('Total calls') }}: <strong id="currentLeadCalls">{{ (int) $current->total_calls }}</strong></span>
-                                    @if($current->next_followup_at)
-                                        <span class="text-sm {{ $current->next_followup_at->isPast() ? 'text-red-600 font-medium' : 'text-gray-600' }}" id="currentLeadFollowup">
-                                            {{ __('Follow-up') }}: {{ $current->next_followup_at->format('d M, h:i A') }}
-                                            @if($current->next_followup_at->isPast())
-                                                ({{ __('Overdue') }})
-                                            @endif
+                                    <span class="text-sm {{ $current->next_followup_at && $current->next_followup_at->isPast() ? 'text-red-600 font-medium' : 'text-gray-600' }}"
+                                          id="currentLeadFollowup"
+                                          style="{{ $current->next_followup_at ? '' : 'display:none' }}">
+                                        {{ __('Follow-up') }}:
+                                        <span id="currentLeadFollowupText">{{ $current->next_followup_at ? $current->next_followup_at->format('d M, h:i A') : '' }}</span>
+                                        <span id="currentLeadOverdueTag" style="{{ $current->next_followup_at && $current->next_followup_at->isPast() ? '' : 'display:none' }}">
+                                            ({{ __('Overdue') }})
                                         </span>
-                                    @endif
+                                    </span>
                                 </div>
                                 @if($current->last_call_notes)
                                     <div class="mt-3 p-2 bg-gray-50 rounded text-sm text-gray-600" id="currentLeadNotes">
@@ -159,10 +160,12 @@
                                 <div class="queue-item flex items-center gap-3 px-4 py-2.5 border-b border-gray-100 hover:bg-gray-50 cursor-pointer {{ $idx === 0 ? 'bg-emerald-50 border-l-4 border-l-emerald-500' : '' }}"
                                      data-lead-id="{{ $s->id }}"
                                      data-name="{{ $s->name }}"
+                                     data-father="{{ $s->father_name }}"
                                      data-phone="{{ $ph ? '+91'.substr($ph,-10) : '' }}"
                                      data-status="{{ $stLabel }}"
                                      data-calls="{{ (int) $s->total_calls }}"
                                      data-followup="{{ $s->next_followup_at ? $s->next_followup_at->format('d M, h:i A') : '' }}"
+                                     data-overdue="{{ $s->next_followup_at && $s->next_followup_at->isPast() ? '1' : '0' }}"
                                      data-notes="{{ $s->last_call_notes ? Str::limit($s->last_call_notes, 80) : '' }}"
                                      onclick="selectLead({{ $s->id }}, {{ $idx + 1 }})">
                                     <span class="w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold {{ $idx === 0 ? 'bg-emerald-600 text-white' : 'bg-gray-200 text-gray-700' }}">{{ $idx + 1 }}</span>
@@ -231,6 +234,13 @@
             const item = document.querySelector('.queue-item[data-lead-id="' + leadId + '"]');
             if (!item) return;
             document.getElementById('currentLeadName').textContent = item.dataset.name || '';
+            const fatherWrap = document.getElementById('currentLeadFather');
+            const fatherNameEl = document.getElementById('currentLeadFatherName');
+            const father = (item.dataset.father || '').trim();
+            if (fatherWrap && fatherNameEl) {
+                fatherNameEl.textContent = father;
+                fatherWrap.style.display = father ? 'block' : 'none';
+            }
             const nameLink = document.getElementById('currentLeadNameLink');
             if (nameLink) nameLink.href = '{{ url("students") }}/' + leadId;
             const phone = item.dataset.phone || '';
@@ -243,9 +253,17 @@
             document.getElementById('currentLeadStatus').textContent = item.dataset.status || '';
             document.getElementById('currentLeadCalls').textContent = item.dataset.calls || '0';
             const followupEl = document.getElementById('currentLeadFollowup');
-            if (followupEl) {
-                followupEl.textContent = item.dataset.followup ? ('{{ __("Follow-up") }}: ' + item.dataset.followup) : '';
-                followupEl.closest('.flex')?.querySelector('.text-sm')?.remove();
+            const followupTextEl = document.getElementById('currentLeadFollowupText');
+            const overdueTagEl = document.getElementById('currentLeadOverdueTag');
+            if (followupEl && followupTextEl && overdueTagEl) {
+                const f = (item.dataset.followup || '').trim();
+                const isOverdue = (item.dataset.overdue || '0') === '1';
+                followupTextEl.textContent = f;
+                followupEl.style.display = f ? 'inline' : 'none';
+                overdueTagEl.style.display = f && isOverdue ? 'inline' : 'none';
+                followupEl.classList.toggle('text-red-600', isOverdue);
+                followupEl.classList.toggle('font-medium', isOverdue);
+                followupEl.classList.toggle('text-gray-600', !isOverdue);
             }
             const notesEl = document.getElementById('currentLeadNotes');
             if (notesEl) {
@@ -276,6 +294,13 @@
                     const L = data.lead;
                     document.getElementById('currentLeadId').value = L.id;
                     document.getElementById('currentLeadName').textContent = L.name;
+                    const fatherWrap = document.getElementById('currentLeadFather');
+                    const fatherNameEl = document.getElementById('currentLeadFatherName');
+                    if (fatherWrap && fatherNameEl) {
+                        const father = (L.father_name || '').trim();
+                        fatherNameEl.textContent = father;
+                        fatherWrap.style.display = father ? 'block' : 'none';
+                    }
                     const nameLink = document.getElementById('currentLeadNameLink');
                     if (nameLink) nameLink.href = '{{ url("students") }}/' + L.id;
                     const phoneEl = document.getElementById('currentLeadPhone');
@@ -287,8 +312,17 @@
                     document.getElementById('currentLeadStatus').textContent = L.status_label;
                     document.getElementById('currentLeadCalls').textContent = L.total_calls;
                     const followupEl = document.getElementById('currentLeadFollowup');
-                    if (followupEl) {
-                        followupEl.textContent = L.next_followup_at ? ('{{ __("Follow-up") }}: ' + L.next_followup_at) : '';
+                    const followupTextEl = document.getElementById('currentLeadFollowupText');
+                    const overdueTagEl = document.getElementById('currentLeadOverdueTag');
+                    if (followupEl && followupTextEl && overdueTagEl) {
+                        const f = (L.next_followup_at || '').trim();
+                        const isOverdue = !!L.is_overdue;
+                        followupTextEl.textContent = f;
+                        followupEl.style.display = f ? 'inline' : 'none';
+                        overdueTagEl.style.display = f && isOverdue ? 'inline' : 'none';
+                        followupEl.classList.toggle('text-red-600', isOverdue);
+                        followupEl.classList.toggle('font-medium', isOverdue);
+                        followupEl.classList.toggle('text-gray-600', !isOverdue);
                     }
                     const notesEl = document.getElementById('currentLeadNotes');
                     if (notesEl) {
