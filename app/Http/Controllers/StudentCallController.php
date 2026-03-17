@@ -105,7 +105,10 @@ class StudentCallController extends Controller
         $student->total_calls = (int) $student->total_calls + 1;
         $student->last_call_at = $call->called_at;
         $student->last_call_status = $call->call_status;
-        $student->last_call_notes = $call->call_notes;
+        // Preserve previous notes if this call has no notes, so important history is not lost.
+        $student->last_call_notes = $call->call_notes !== null && trim($call->call_notes) !== ''
+            ? $call->call_notes
+            : $student->last_call_notes;
         $student->next_followup_at = $call->next_followup_at;
         if ($newLeadStatus) {
             $student->lead_status = $newLeadStatus;
