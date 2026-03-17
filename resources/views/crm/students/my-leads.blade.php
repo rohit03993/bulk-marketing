@@ -26,6 +26,7 @@
                                     'lead' => __('Uncalled'),
                                     'interested' => __('Interested'),
                                     'not_interested' => __('Not Interested'),
+                                    'converted' => __('Converted (Walk-in + Admission)'),
                                     'walkin_done' => __('Walk-in Done'),
                                     'admission_done' => __('Admission Done'),
                                     'follow_up_later' => __('Follow-up Later'),

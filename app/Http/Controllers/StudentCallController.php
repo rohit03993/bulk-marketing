@@ -20,14 +20,6 @@ class StudentCallController extends Controller
 
     private const TERMINAL_LEAD_STATUSES = ['not_interested', 'admission_done'];
 
-    private const NOT_CONNECTED_STATUSES = [
-        StudentCall::STATUS_NO_ANSWER,
-        StudentCall::STATUS_BUSY,
-        StudentCall::STATUS_SWITCHED_OFF,
-        StudentCall::STATUS_NOT_REACHABLE,
-        StudentCall::STATUS_WRONG_NUMBER,
-        StudentCall::STATUS_CALLBACK,
-    ];
 
     private const MAX_NOT_CONNECTED_ATTEMPTS = 3; // within the lookback window
 
@@ -208,12 +200,12 @@ class StudentCallController extends Controller
         }
 
         // Not-connected: only schedule while attempts are under the cap.
-        if (in_array($callStatus, self::NOT_CONNECTED_STATUSES, true)) {
+        if (in_array($callStatus, StudentCall::notConnectedStatuses(), true)) {
             $lookbackFrom = $now->copy()->subDays(self::NOT_CONNECTED_LOOKBACK_DAYS);
 
             $failedAttempts = StudentCall::where('student_id', $student->id)
                 ->where('user_id', $user->id)
-                ->whereIn('call_status', self::NOT_CONNECTED_STATUSES)
+                ->whereIn('call_status', StudentCall::notConnectedStatuses())
                 ->whereBetween('called_at', [$lookbackFrom, $now])
                 ->count();
 

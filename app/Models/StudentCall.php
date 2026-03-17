@@ -70,6 +70,19 @@ class StudentCall extends Model
         self::STATUS_CALLBACK => 'Callback Requested',
     ];
 
+    /** Statuses that count as "not connected" for cap (e.g. 3 attempts in 7 days). */
+    public static function notConnectedStatuses(): array
+    {
+        return [
+            self::STATUS_NO_ANSWER,
+            self::STATUS_BUSY,
+            self::STATUS_SWITCHED_OFF,
+            self::STATUS_NOT_REACHABLE,
+            self::STATUS_WRONG_NUMBER,
+            self::STATUS_CALLBACK,
+        ];
+    }
+
     public function student()
     {
         return $this->belongsTo(Student::class);

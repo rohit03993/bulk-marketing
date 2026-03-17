@@ -21,7 +21,11 @@ class StudentLeadController extends Controller
             ->orderBy('name');
 
         if ($request->filled('status') && $request->status !== 'all') {
-            $query->where('lead_status', $request->status);
+            if ($request->status === 'converted') {
+                $query->whereIn('lead_status', ['walkin_done', 'admission_done']);
+            } else {
+                $query->where('lead_status', $request->status);
+            }
         }
         if ($request->has('called')) {
             $request->called == '0'

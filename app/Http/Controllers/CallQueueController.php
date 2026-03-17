@@ -10,9 +10,14 @@ use Illuminate\Support\Carbon;
 /**
  * Call Queue (Start Calling): one-by-one lead view for telecallers.
  * Shows today's queue, one lead at a time; Call Now opens dialer then Log Call modal.
+ * Excludes students with 3+ not-connected attempts in the last 7 days (same rule as follow-up cap).
  */
 class CallQueueController extends Controller
 {
+    private const MAX_NOT_CONNECTED_ATTEMPTS = 3;
+
+    private const NOT_CONNECTED_LOOKBACK_DAYS = 7;
+
     public function index(Request $request)
     {
         $user = $request->user();
@@ -89,7 +94,8 @@ class CallQueueController extends Controller
 
         $query = Student::with(['classSection.school'])
             ->where('assigned_to', $user->id)
-            ->whereNotIn('lead_status', ['admission_done', 'not_interested']);
+            ->whereNotIn('lead_status', ['admission_done', 'not_interested'])
+            ->whereNotIn('id', $this->studentIdsExcludedByNotConnectedCap($user));
 
         $query->where(function ($q) use ($today, $now) {
             $q->where('total_calls', 0)
@@ -123,6 +129,23 @@ class CallQueueController extends Controller
             ->orderBy('created_at');
 
         return $query->limit(50)->get();
+    }
+
+    /**
+     * Student IDs that have 3+ not-connected attempts in the last 7 days by this user.
+     * These are excluded from the call queue (same cap as follow-up scheduling).
+     */
+    private function studentIdsExcludedByNotConnectedCap($user): \Illuminate\Support\Collection
+    {
+        $cutoff = now()->subDays(self::NOT_CONNECTED_LOOKBACK_DAYS);
+
+        return StudentCall::where('user_id', $user->id)
+            ->whereIn('call_status', StudentCall::notConnectedStatuses())
+            ->where('called_at', '>=', $cutoff)
+            ->select('student_id')
+            ->groupBy('student_id')
+            ->havingRaw('COUNT(*) >= ?', [self::MAX_NOT_CONNECTED_ATTEMPTS])
+            ->pluck('student_id');
     }
 
     private function getTodayStats($user): array
