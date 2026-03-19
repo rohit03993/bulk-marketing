@@ -256,8 +256,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('staff/{staff}/revoke-students', [StaffController::class, 'revokeStudents'])->name('staff.revoke-students');
         Route::get('settings/postcall-whatsapp', [\App\Http\Controllers\AdminSettingsController::class, 'postcallWhatsapp'])->name('settings.postcall-whatsapp');
         Route::post('settings/postcall-whatsapp', [\App\Http\Controllers\AdminSettingsController::class, 'postcallWhatsappUpdate'])->name('settings.postcall-whatsapp.update');
-        Route::get('reset-data', [DataResetController::class, 'showResetForm'])->name('reset-data');
-        Route::post('reset-data', [DataResetController::class, 'reset'])->name('reset-data.perform');
+        // Hidden danger-zone route for destructive data operations.
+        Route::get('ops/danger-zone/data-reset', [DataResetController::class, 'showResetForm'])->name('reset-data');
+        Route::post('ops/danger-zone/data-reset', [DataResetController::class, 'reset'])->name('reset-data.perform');
         Route::get('/', function () {
             $schools = \App\Models\School::withCount('classSections')->orderBy('name')->get();
             $sessions = \App\Models\AcademicSession::orderByDesc('starts_at')->get();
