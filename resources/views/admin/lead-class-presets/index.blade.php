@@ -36,6 +36,7 @@
                         <div>
                             <label class="block text-sm font-medium text-slate-700">{{ __('Stream') }}</label>
                             <select name="stream" class="mt-1 block w-full rounded-md border-gray-300 text-sm focus:ring-indigo-500 focus:border-indigo-500">
+                                <option value="" {{ old('stream') === '' ? 'selected' : '' }}>{{ __('No stream') }}</option>
                                 <option value="NEET" {{ old('stream') === 'NEET' ? 'selected' : '' }}>NEET</option>
                                 <option value="JEE" {{ old('stream') === 'JEE' ? 'selected' : '' }}>JEE</option>
                             </select>

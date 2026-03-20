@@ -29,8 +29,13 @@ class LeadClassPreset extends Model
             default => 'th',
         };
 
+        $stream = strtoupper(trim((string) $this->stream));
+        if ($stream === '') {
+            return $this->grade . $suffix;
+        }
+
         // Keep it simple: "11th (NEET)" style.
-        return $this->grade . $suffix . ' (' . strtoupper(trim((string) $this->stream)) . ')';
+        return $this->grade . $suffix . ' (' . $stream . ')';
     }
 }
 

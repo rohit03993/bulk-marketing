@@ -155,7 +155,9 @@ class StudentLeadController extends Controller
         }
 
         $className = (string) $preset->grade;
-        $sectionName = strtoupper(trim((string) $preset->stream));
+        $rawStream = strtoupper(trim((string) $preset->stream));
+        // When preset has "no stream", create/lookup a ClassSection with section_name = NULL.
+        $sectionName = $rawStream === '' ? null : $rawStream;
 
         $classSection = ClassSection::query()->firstOrCreate([
             'school_id' => $school->id,

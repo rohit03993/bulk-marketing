@@ -24,9 +24,16 @@ class LeadClassPresetController extends Controller
     {
         $data = $request->validate([
             'grade' => 'required|integer|in:9,10,11,12,13',
-            'stream' => 'required|string|in:NEET,JEE',
+            'stream' => ['nullable', 'string', 'max:10', 'regex:/^(NEET|JEE)?$/'],
             'is_active' => 'nullable|boolean',
         ]);
+
+        $stream = trim((string) ($data['stream'] ?? ''));
+        // Store "no stream" as empty string so the existing DB schema (non-null column)
+        // stays compatible with the unique (grade, stream) constraint.
+        if ($stream === '') {
+            $stream = '';
+        }
 
         $nextOrder = LeadClassPreset::query()->max('display_order') + 1;
         if (! is_numeric($nextOrder) || $nextOrder < 1) {
@@ -34,7 +41,7 @@ class LeadClassPresetController extends Controller
         }
 
         $preset = LeadClassPreset::query()->updateOrCreate(
-            ['grade' => (int) $data['grade'], 'stream' => $data['stream']],
+            ['grade' => (int) $data['grade'], 'stream' => $stream],
             [
                 'is_active' => (bool) ($data['is_active'] ?? true),
                 'display_order' => $nextOrder,
