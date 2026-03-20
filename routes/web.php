@@ -259,11 +259,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('settings/postcall-whatsapp', [\App\Http\Controllers\AdminSettingsController::class, 'postcallWhatsapp'])->name('settings.postcall-whatsapp');
         Route::post('settings/postcall-whatsapp', [\App\Http\Controllers\AdminSettingsController::class, 'postcallWhatsappUpdate'])->name('settings.postcall-whatsapp.update');
 
-        // Lead categories for tellcaller-created leads (tag type = telecaller_lead_category)
-        Route::get('lead-categories', [\App\Http\Controllers\LeadCategoryController::class, 'index'])->name('lead-categories.index');
-        Route::post('lead-categories', [\App\Http\Controllers\LeadCategoryController::class, 'store'])->name('lead-categories.store');
-        Route::delete('lead-categories/{tag}', [\App\Http\Controllers\LeadCategoryController::class, 'destroy'])->name('lead-categories.destroy');
-
         // Lead class presets for tellcaller (fixed NEET/JEE options, admin-configurable)
         Route::get('lead-class-presets', [\App\Http\Controllers\LeadClassPresetController::class, 'index'])->name('lead-class-presets.index');
         Route::post('lead-class-presets', [\App\Http\Controllers\LeadClassPresetController::class, 'store'])->name('lead-class-presets.store');

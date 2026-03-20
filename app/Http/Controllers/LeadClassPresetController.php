@@ -23,7 +23,7 @@ class LeadClassPresetController extends Controller
     public function store(Request $request)
     {
         $data = $request->validate([
-            'grade' => 'required|integer|in:9,10,11,12,13',
+            'grade' => 'required|integer|in:1,2,3,4,5,6,7,8,9,10,11,12,13',
             'stream' => ['nullable', 'string', 'max:10', 'regex:/^(NEET|JEE)?$/'],
             'is_active' => 'nullable|boolean',
         ]);

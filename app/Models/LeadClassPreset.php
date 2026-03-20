@@ -24,18 +24,28 @@ class LeadClassPreset extends Model
 
     public function getDisplayLabelAttribute(): string
     {
-        $suffix = match ((int) $this->grade) {
-            9 => 'th', // will render as 9th
-            default => 'th',
-        };
+        $grade = (int) $this->grade;
+        // English ordinal suffix (1st/2nd/3rd/4th... and special cases 11/12/13 => 'th')
+        $lastTwo = $grade % 100;
+        if (in_array($lastTwo, [11, 12, 13], true)) {
+            $suffix = 'th';
+        } else {
+            $lastOne = $grade % 10;
+            $suffix = match ($lastOne) {
+                1 => 'st',
+                2 => 'nd',
+                3 => 'rd',
+                default => 'th',
+            };
+        }
 
         $stream = strtoupper(trim((string) $this->stream));
         if ($stream === '') {
-            return $this->grade . $suffix;
+            return $grade . $suffix;
         }
 
         // Keep it simple: "11th (NEET)" style.
-        return $this->grade . $suffix . ' (' . $stream . ')';
+        return $grade . $suffix . ' (' . $stream . ')';
     }
 }
 

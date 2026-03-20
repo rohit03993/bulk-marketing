@@ -25,7 +25,7 @@
                         <div>
                             <label class="block text-sm font-medium text-slate-700">{{ __('Grade') }}</label>
                             <select name="grade" class="mt-1 block w-full rounded-md border-gray-300 text-sm focus:ring-indigo-500 focus:border-indigo-500">
-                                @foreach ([9,10,11,12,13] as $g)
+                                @foreach ([1,2,3,4,5,6,7,8,9,10,11,12,13] as $g)
                                     <option value="{{ $g }}" {{ old('grade', '11') == $g ? 'selected' : '' }}>{{ $g }}</option>
                                 @endforeach
                             </select>
