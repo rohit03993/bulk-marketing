@@ -12,6 +12,7 @@ use App\Models\ClassSection;
 use App\Services\TelecallerScoreService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rules\Password;
 use Illuminate\Support\Carbon;
 
@@ -56,6 +57,7 @@ class StaffController extends Controller
             : null;
         $filterSchoolId = $request->input('school_id');
         $filterClassSectionId = $request->input('class_section_id');
+        $filterAddedByMe = $request->boolean('added_by_me');
 
         if ($filterFrom && $filterTo && $filterFrom->lte($filterTo)) {
             $recentCallsQuery->whereBetween('called_at', [$filterFrom, $filterTo]);
@@ -98,6 +100,7 @@ class StaffController extends Controller
 
         $studentsQuery = Student::with(['classSection.school'])
             ->where('assigned_to', $staff->id)
+            ->when($filterAddedByMe, fn ($q) => $q->where('assigned_by', $staff->id))
             ->orderBy('name');
         if ($filterLeadStatus !== null) {
             $studentsQuery->where('lead_status', $filterLeadStatus);
@@ -120,6 +123,10 @@ class StaffController extends Controller
             ->all();
 
         $totalUncalled = $allAssignedIds->filter(fn ($id) => empty($callCountsByStudent[$id] ?? 0))->count();
+        $uncalledStudentIdsAll = $allAssignedIds
+            ->filter(fn ($id) => empty($callCountsByStudent[$id] ?? 0))
+            ->values()
+            ->all();
 
         $students = $studentsQuery->paginate(10, ['*'], 'students_page')->withQueryString();
 
@@ -142,15 +149,16 @@ class StaffController extends Controller
             'follow_up_later' => __('Follow-up Later'),
         ];
 
-        // Lifetime stats for this telecaller (not affected by filters).
-        $assignedTotal = Student::where('assigned_to', $staff->id)->count();
-        $convertedWalkin = Student::where('assigned_to', $staff->id)
+        // Lifetime stats for this telecaller (optionally filtered by "added_by_me").
+        $assignedColumn = $filterAddedByMe ? 'assigned_by' : 'assigned_to';
+        $assignedTotal = Student::where($assignedColumn, $staff->id)->count();
+        $convertedWalkin = Student::where($assignedColumn, $staff->id)
             ->where('lead_status', 'walkin_done')
             ->count();
-        $convertedAdmission = Student::where('assigned_to', $staff->id)
+        $convertedAdmission = Student::where($assignedColumn, $staff->id)
             ->where('lead_status', 'admission_done')
             ->count();
-        $exitedNotInterested = Student::where('assigned_to', $staff->id)
+        $exitedNotInterested = Student::where($assignedColumn, $staff->id)
             ->where('lead_status', 'not_interested')
             ->count();
 
@@ -178,6 +186,7 @@ class StaffController extends Controller
             'students' => $students,
             'callCountsByStudent' => $callCountsByStudent,
             'totalUncalled' => $totalUncalled,
+            'uncalledStudentIdsAll' => $uncalledStudentIdsAll,
             'campaigns' => $campaigns,
             'messagesSent' => $messagesSent,
             'assignedTotal' => $assignedTotal,

@@ -40,6 +40,17 @@
                         </select>
                         <x-input-error :messages="$errors->get('academic_session_id')" class="mt-1" />
                     </div>
+
+                    <div class="pt-1">
+                        <button type="button" id="neetJeePresetBtn"
+                                class="w-full inline-flex items-center justify-center px-3 py-2 bg-emerald-600 text-white text-sm font-medium rounded-md hover:bg-emerald-700 transition">
+                            {{ __('Add NEET/JEE presets (9-13)') }}
+                        </button>
+                        <p class="text-xs text-slate-500 mt-1">
+                            {{ __('Creates only missing class/stream combinations for this school + session. No merging with existing ones.') }}
+                        </p>
+                    </div>
+
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
                             <x-input-label for="class_name" :value="__('Class (e.g. 6, 7)')" />
@@ -57,6 +68,30 @@
                     </div>
                 </form>
             </div>
+
+            <form method="POST" action="{{ route('class-sections.presets.neet-jee') }}" id="neetJeePresetForm">
+                @csrf
+                <input type="hidden" name="school_id" id="neetJeePresetSchoolId">
+                <input type="hidden" name="academic_session_id" id="neetJeePresetSessionId">
+            </form>
         </div>
     </div>
+
+    <script>
+        (function () {
+            const btn = document.getElementById('neetJeePresetBtn');
+            if (!btn) return;
+            const schoolSelect = document.getElementById('school_id');
+            const sessionSelect = document.getElementById('academic_session_id');
+            const presetSchool = document.getElementById('neetJeePresetSchoolId');
+            const presetSession = document.getElementById('neetJeePresetSessionId');
+            const presetForm = document.getElementById('neetJeePresetForm');
+
+            btn.addEventListener('click', function () {
+                if (presetSchool && schoolSelect) presetSchool.value = schoolSelect.value;
+                if (presetSession && sessionSelect) presetSession.value = sessionSelect.value;
+                presetForm?.submit();
+            });
+        })();
+    </script>
 </x-app-layout>

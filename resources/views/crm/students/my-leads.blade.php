@@ -1,7 +1,9 @@
 <x-app-layout>
     <x-slot name="header">
         <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <h2 class="font-semibold text-xl text-gray-800 leading-tight">{{ __('My Leads') }}</h2>
+            <h2 class="font-semibold text-xl text-gray-800 leading-tight">
+                {{ __('My Leads') }} — {{ auth()->user()->name }}
+            </h2>
             <a href="{{ route('students.index') }}"
                class="inline-flex items-center px-3 py-1.5 border border-gray-300 rounded-md text-xs font-medium text-gray-700 bg-white hover:bg-gray-50">
                 {{ __('All students') }}
@@ -15,8 +17,138 @@
                 <div class="mb-4 rounded-md bg-green-50 p-4 text-sm text-green-800">{{ session('success') }}</div>
             @endif
 
+            <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-4">
+                <div class="flex items-start justify-between gap-4">
+                    <div>
+                        <h3 class="text-sm font-semibold text-gray-900">{{ __('Add Lead') }}</h3>
+                        <p class="text-xs text-gray-500 mt-1">{{ __('New leads will be created as Uncalled and assigned to you.') }}</p>
+                    </div>
+                </div>
+
+                <form method="POST" action="{{ route('students.my-leads.add') }}" class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
+                    @csrf
+
+                    <div>
+                        <label class="block text-xs font-medium text-gray-500">{{ __('Class (fixed presets)') }}</label>
+                        <select name="class_preset_id"
+                                class="mt-1 block w-full rounded-md border-gray-300 text-sm @error('class_preset_id') border-red-500 @enderror">
+                            <option value="">{{ __('Select class') }}</option>
+                            @foreach ($classPresets as $p)
+                                <option value="{{ $p->id }}"
+                                        {{ (string) old('class_preset_id', request('class_preset_id')) === (string) $p->id ? 'selected' : '' }}>
+                                    {{ $p->display_label }}
+                                </option>
+                            @endforeach
+                        </select>
+                        @error('class_preset_id')
+                            <div class="text-xs text-red-600 mt-1">{{ $message }}</div>
+                        @enderror
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-medium text-gray-500">{{ __('School') }}</label>
+                        <select name="school_id"
+                                id="schoolChoice"
+                                class="mt-1 block w-full rounded-md border-gray-300 text-sm @error('school_id') border-red-500 @enderror">
+                            @foreach ($schools as $s)
+                                <option value="{{ $s->id }}" {{ (string) old('school_id') === (string) $s->id ? 'selected' : '' }}>
+                                    {{ $s->name }}
+                                </option>
+                            @endforeach
+                            <option value="not_in_list" {{ old('school_id') === 'not_in_list' ? 'selected' : '' }}>
+                                {{ __('Not in list') }}
+                            </option>
+                        </select>
+                        @error('school_id')
+                            <div class="text-xs text-red-600 mt-1">{{ $message }}</div>
+                        @enderror
+                    </div>
+
+                    <div id="newSchoolWrap" style="{{ old('school_id') === 'not_in_list' ? '' : 'display:none' }}">
+                        <label class="block text-xs font-medium text-gray-500">{{ __('Enter school name') }}</label>
+                        <input type="text"
+                               name="new_school_name"
+                               value="{{ old('new_school_name') }}"
+                               placeholder="{{ __('Type school name') }}"
+                               class="mt-1 block w-full rounded-md border-gray-300 text-sm @error('new_school_name') border-red-500 @enderror">
+                        @error('new_school_name')
+                            <div class="text-xs text-red-600 mt-1">{{ $message }}</div>
+                        @enderror
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-medium text-gray-500">{{ __('Student name') }}</label>
+                        <input type="text" name="name" value="{{ old('name') }}" placeholder="{{ __('Enter student name') }}"
+                               class="mt-1 block w-full rounded-md border-gray-300 text-sm @error('name') border-red-500 @enderror">
+                        @error('name')
+                            <div class="text-xs text-red-600 mt-1">{{ $message }}</div>
+                        @enderror
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-medium text-gray-500">{{ __('Father name') }}</label>
+                        <input type="text" name="father_name" value="{{ old('father_name') }}" placeholder="{{ __('Enter father name') }}"
+                               class="mt-1 block w-full rounded-md border-gray-300 text-sm @error('father_name') border-red-500 @enderror">
+                        @error('father_name')
+                            <div class="text-xs text-red-600 mt-1">{{ $message }}</div>
+                        @enderror
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-medium text-gray-500">{{ __('WhatsApp (primary)') }}</label>
+                        <x-phone-input name="whatsapp_phone_primary" :value="old('whatsapp_phone_primary')" class="mt-1 block w-full @error('whatsapp_phone_primary') border-red-500 @enderror" />
+                        @error('whatsapp_phone_primary')
+                            <div class="text-xs text-red-600 mt-1">{{ $message }}</div>
+                        @enderror
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-medium text-gray-500">{{ __('WhatsApp (secondary)') }}</label>
+                        <x-phone-input name="whatsapp_phone_secondary" :value="old('whatsapp_phone_secondary')" class="mt-1 block w-full @error('whatsapp_phone_secondary') border-red-500 @enderror" />
+                        @error('whatsapp_phone_secondary')
+                            <div class="text-xs text-red-600 mt-1">{{ $message }}</div>
+                        @enderror
+                    </div>
+
+                    <div class="md:col-span-2 flex gap-3 pt-1">
+                        <button type="submit"
+                                class="inline-flex items-center px-4 py-2 bg-gray-800 text-white text-sm font-medium rounded-md hover:bg-gray-700 disabled:opacity-60 disabled:cursor-not-allowed"
+                                >
+                            {{ __('Add Lead') }}
+                        </button>
+                        <a href="{{ route('students.my-leads') }}"
+                           class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
+                            {{ __('Reset') }}
+                        </a>
+                    </div>
+                </form>
+            </div>
+
             <form method="GET" action="{{ route('students.my-leads') }}" class="mb-4 space-y-2">
                 <div class="flex flex-wrap gap-2 items-end">
+                    <div class="min-w-[240px]">
+                        <label class="block text-xs font-medium text-gray-500">{{ __('School') }}</label>
+                        <select name="school_id" class="mt-1 block w-full rounded-md border-gray-300 text-sm">
+                            <option value="">{{ __('All schools') }}</option>
+                            @foreach ($schools as $s)
+                                <option value="{{ $s->id }}" {{ (string) request('school_id') === (string) $s->id ? 'selected' : '' }}>
+                                    {{ $s->name }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="min-w-[200px]">
+                        <label class="flex items-center gap-2 text-xs font-medium text-gray-500">
+                            <input
+                                type="checkbox"
+                                name="added_by_me"
+                                value="1"
+                                {{ request('added_by_me') ? 'checked' : '' }}
+                                class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                            />
+                            {{ __('Added by me') }}
+                        </label>
+                    </div>
                     <div class="min-w-[140px]">
                         <label class="block text-xs font-medium text-gray-500">{{ __('Status') }}</label>
                         <select name="status" class="mt-1 block w-full rounded-md border-gray-300 text-sm">
@@ -53,6 +185,19 @@
                     <button type="submit" class="px-4 py-2 bg-gray-800 text-white text-sm rounded-md hover:bg-gray-700">{{ __('Filter') }}</button>
                 </div>
             </form>
+
+            <script>
+                (function () {
+                    const choice = document.getElementById('schoolChoice');
+                    const wrap = document.getElementById('newSchoolWrap');
+                    if (!choice || !wrap) return;
+                    const sync = function () {
+                        wrap.style.display = choice.value === 'not_in_list' ? '' : 'none';
+                    };
+                    choice.addEventListener('change', sync);
+                    sync();
+                })();
+            </script>
 
             @if ($students->isEmpty())
                 <div class="bg-white rounded-lg shadow-sm p-6 text-center text-gray-500">

@@ -81,4 +81,57 @@ class ClassSectionController extends Controller
 
         return redirect()->route('class-sections.index')->with('success', __('Class/Section updated.'));
     }
+
+    /**
+     * Add the standard NEET/JEE class sections (grades 9-13) for a selected school + academic session.
+     * Only inserts missing (school_id, academic_session_id, class_name, section_name) combinations.
+     */
+    public function addNeetJeePreset(Request $request)
+    {
+        $valid = $request->validate([
+            'school_id' => 'required|exists:schools,id',
+            'academic_session_id' => 'required|exists:academic_sessions,id',
+        ]);
+
+        $presets = [
+            ['class_name' => '9', 'section_name' => 'NEET'],
+            ['class_name' => '10', 'section_name' => 'NEET'],
+            ['class_name' => '11', 'section_name' => 'NEET'],
+            ['class_name' => '11', 'section_name' => 'JEE'],
+            ['class_name' => '12', 'section_name' => 'NEET'],
+            ['class_name' => '12', 'section_name' => 'JEE'],
+            ['class_name' => '13', 'section_name' => 'NEET'],
+            ['class_name' => '13', 'section_name' => 'JEE'],
+        ];
+
+        $created = 0;
+        $skipped = 0;
+
+        foreach ($presets as $p) {
+            $exists = ClassSection::query()
+                ->where('school_id', $valid['school_id'])
+                ->where('academic_session_id', $valid['academic_session_id'])
+                ->whereRaw('TRIM(class_name) = ?', [trim($p['class_name'])])
+                ->whereRaw('UPPER(TRIM(section_name)) = ?', [strtoupper(trim($p['section_name']))])
+                ->exists();
+
+            if ($exists) {
+                $skipped++;
+                continue;
+            }
+
+            ClassSection::create([
+                'school_id' => $valid['school_id'],
+                'academic_session_id' => $valid['academic_session_id'],
+                'class_name' => $p['class_name'],
+                'section_name' => $p['section_name'],
+            ]);
+            $created++;
+        }
+
+        return redirect()->back()->with(
+            'success',
+            __('Preset added. New: :created, already existed: :skipped.', ['created' => $created, 'skipped' => $skipped])
+        );
+    }
 }

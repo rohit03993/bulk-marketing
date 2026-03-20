@@ -6,6 +6,8 @@
             </h2>
             <div class="flex items-center gap-3">
                 <a href="{{ route('admin.staff.index') }}" class="text-sm text-slate-700 hover:text-blue-600 font-medium transition">{{ __('Staff') }}</a>
+                <a href="{{ route('admin.lead-categories.index') }}" class="text-sm text-slate-700 hover:text-blue-600 font-medium transition">{{ __('Lead Categories') }}</a>
+                <a href="{{ route('admin.lead-class-presets.index') }}" class="text-sm text-slate-700 hover:text-blue-600 font-medium transition">{{ __('Lead Class Presets') }}</a>
                 <a href="{{ route('admin.settings.postcall-whatsapp') }}" class="text-sm text-slate-700 hover:text-blue-600 font-medium transition">{{ __('Auto WhatsApp') }}</a>
                 <a href="{{ route('dashboard') }}" class="text-sm text-slate-500 hover:text-blue-600 transition">← {{ __('Back to dashboard') }}</a>
             </div>

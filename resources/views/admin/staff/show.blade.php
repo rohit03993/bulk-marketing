@@ -70,10 +70,22 @@
                             <option value="">{{ __('All') }}</option>
                             @foreach ($classSections ?? [] as $cs)
                                 <option value="{{ $cs->id }}" {{ (request('class_section_id') == $cs->id) ? 'selected' : '' }}>
-                                    {{ $cs->full_name ?? ($cs->class_name . ' ' . $cs->section_name) }}
+                                    {{ $cs->class_name }}{{ $cs->section_name ? ' - ' . $cs->section_name : '' }}
                                 </option>
                             @endforeach
                         </select>
+                    </div>
+                    <div class="min-w-[180px]">
+                        <label class="flex items-center gap-2 text-xs font-medium text-blue-700">
+                            <input
+                                type="checkbox"
+                                name="added_by_me"
+                                value="1"
+                                {{ request('added_by_me') ? 'checked' : '' }}
+                                class="rounded border-blue-200 text-blue-600 focus:ring-blue-500"
+                            />
+                            {{ __('Added by this telecaller') }}
+                        </label>
                     </div>
                     <button type="submit" class="inline-flex items-center px-4 py-2 rounded-lg text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 shadow-md shadow-blue-200/50 transition">
                         {{ __('Apply') }}
@@ -111,7 +123,9 @@
                 </div>
                 <div class="bg-white rounded-2xl shadow-lg shadow-blue-100/40 border border-blue-100 p-5 overflow-hidden relative">
                     <div class="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-blue-500/15 to-transparent rounded-bl-full"></div>
-                    <p class="text-xs font-medium text-blue-600">{{ __('Students assigned') }}</p>
+                    <p class="text-xs font-medium text-blue-600">
+                        {{ request('added_by_me') ? __('Leads added by telecaller') : __('Students assigned') }}
+                    </p>
                     <p class="mt-2 text-3xl font-extrabold text-blue-700">
                         {{ $assignedTotal ?? $students->total() }}
                     </p>
@@ -246,7 +260,7 @@
                     </div>
                 </div>
                 <div class="flex flex-wrap items-center justify-end gap-2 mb-4">
-                    @if ($uncalledCountOnPage > 0)
+                    @if (($totalUncalled ?? 0) > 0)
                         <form method="POST" action="{{ route('admin.staff.revoke-students', $staff) }}" id="revokeForm"
                               onsubmit="return confirm('{{ __('Revoke selected students? They will become unassigned.') }}')">
                             @csrf
@@ -259,9 +273,9 @@
                                 {{ __('Revoke selected') }} (<span x-text="selectedIds.length"></span>)
                             </button>
                         </form>
-                        <button type="button" @click="selectAll = !selectAll; selectedIds = selectAll ? {{ json_encode($uncalledStudentIds) }} : []"
+                        <button type="button" @click="selectAll = !selectAll; selectedIds = selectAll ? {{ json_encode($uncalledStudentIdsAll) }} : []"
                                 class="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 transition">
-                            <span x-text="selectAll ? '{{ __('Deselect all') }}' : '{{ __('Select all uncalled') }}'"></span>
+                            <span x-text="selectAll ? '{{ __('Deselect all') }}' : '{{ __('Select all uncalled (all pages)') }}'"></span>
                         </button>
                     @endif
                     @if (($totalUncalled ?? 0) > 0 && request('school_id') && request('class_section_id'))
@@ -311,7 +325,8 @@
                                             @if ($canRevoke)
                                                 <input type="checkbox" value="{{ $student->id }}"
                                                        class="rounded border-blue-300 text-blue-600 focus:ring-blue-500"
-                                                       @change="$event.target.checked ? selectedIds.push({{ $student->id }}) : selectedIds = selectedIds.filter(i => i !== {{ $student->id }})">
+                                                       :checked="selectedIds.includes({{ $student->id }})"
+                                                       @change="$event.target.checked ? (selectedIds = [...selectedIds, {{ $student->id }}]) : (selectedIds = selectedIds.filter(i => i !== {{ $student->id }}))">
                                             @endif
                                         </td>
                                     @endif

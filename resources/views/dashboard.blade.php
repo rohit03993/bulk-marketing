@@ -160,11 +160,11 @@
                             <p class="text-xs text-indigo-200">{{ __('Open call queue') }}</p>
                         </div>
                     </a>
-                    <a href="{{ route('students.my-leads') }}" class="flex-1 min-w-[140px] flex items-center gap-3 bg-white text-slate-700 rounded-2xl px-5 py-4 shadow-sm border border-slate-200 hover:border-indigo-300 hover:shadow-md transition">
+                    <a href="{{ route('students.my-leads') }}?added_by_me=1" class="flex-1 min-w-[140px] flex items-center gap-3 bg-white text-slate-700 rounded-2xl px-5 py-4 shadow-sm border border-slate-200 hover:border-indigo-300 hover:shadow-md transition">
                         <svg class="w-6 h-6 shrink-0 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
                         <div>
-                            <p class="text-sm font-bold">{{ __('View All Leads') }}</p>
-                            <p class="text-xs text-slate-400">{{ __('Browse assigned leads') }}</p>
+                            <p class="text-sm font-bold">{{ __('My Added Leads') }}</p>
+                            <p class="text-xs text-slate-400">{{ __('Leads you personally added') }}</p>
                         </div>
                     </a>
                 </div>

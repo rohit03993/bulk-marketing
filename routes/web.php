@@ -197,6 +197,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::resource('schools', SchoolController::class)->except('show', 'destroy');
         Route::resource('sessions', AcademicSessionController::class)->except('show', 'destroy')->parameters(['session' => 'academic_session']);
         Route::resource('class-sections', ClassSectionController::class)->except('show', 'destroy');
+        Route::post('class-sections/presets/neet-jee', [ClassSectionController::class, 'addNeetJeePreset'])->name('class-sections.presets.neet-jee');
         Route::resource('students', StudentController::class)->except('show', 'destroy');
         Route::get('students-assign', [StudentAssignmentController::class, 'form'])->name('students.assign');
         Route::post('students-assign', [StudentAssignmentController::class, 'bulkAssign'])->name('students.assign.perform');
@@ -221,6 +222,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('students/{student}/calls', [StudentCallController::class, 'store'])->name('students.calls.store');
         Route::post('students/call/suggest-followup', [StudentCallController::class, 'suggestFollowup'])->name('students.call.suggest-followup');
         Route::get('my-leads', [StudentLeadController::class, 'myLeads'])->name('students.my-leads');
+        Route::post('my-leads/add', [StudentLeadController::class, 'addLead'])->name('students.my-leads.add');
         Route::get('followups', [StudentLeadController::class, 'followups'])->name('students.followups');
         // Call queue (Start Calling) – one lead at a time
         Route::get('call-queue', [CallQueueController::class, 'index'])->name('students.call-queue');
@@ -256,6 +258,17 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('staff/{staff}/revoke-students', [StaffController::class, 'revokeStudents'])->name('staff.revoke-students');
         Route::get('settings/postcall-whatsapp', [\App\Http\Controllers\AdminSettingsController::class, 'postcallWhatsapp'])->name('settings.postcall-whatsapp');
         Route::post('settings/postcall-whatsapp', [\App\Http\Controllers\AdminSettingsController::class, 'postcallWhatsappUpdate'])->name('settings.postcall-whatsapp.update');
+
+        // Lead categories for tellcaller-created leads (tag type = telecaller_lead_category)
+        Route::get('lead-categories', [\App\Http\Controllers\LeadCategoryController::class, 'index'])->name('lead-categories.index');
+        Route::post('lead-categories', [\App\Http\Controllers\LeadCategoryController::class, 'store'])->name('lead-categories.store');
+        Route::delete('lead-categories/{tag}', [\App\Http\Controllers\LeadCategoryController::class, 'destroy'])->name('lead-categories.destroy');
+
+        // Lead class presets for tellcaller (fixed NEET/JEE options, admin-configurable)
+        Route::get('lead-class-presets', [\App\Http\Controllers\LeadClassPresetController::class, 'index'])->name('lead-class-presets.index');
+        Route::post('lead-class-presets', [\App\Http\Controllers\LeadClassPresetController::class, 'store'])->name('lead-class-presets.store');
+        Route::post('lead-class-presets/{preset}/toggle', [\App\Http\Controllers\LeadClassPresetController::class, 'toggle'])->name('lead-class-presets.toggle');
+
         // Hidden danger-zone route for destructive data operations.
         Route::get('ops/danger-zone/data-reset', [DataResetController::class, 'showResetForm'])->name('reset-data');
         Route::post('ops/danger-zone/data-reset', [DataResetController::class, 'reset'])->name('reset-data.perform');
