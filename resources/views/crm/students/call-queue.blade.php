@@ -105,11 +105,9 @@
                                     <button type="button" onclick="makeCall()" class="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-emerald-600 text-white font-medium hover:bg-emerald-700">
                                         <span>📞</span> {{ __('Call Now') }}
                                     </button>
-                                    @if($phoneDisplay)
-                                        <a href="https://wa.me/91{{ $phone }}" target="_blank" class="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-green-600 text-white font-medium hover:bg-green-700">
-                                            {{ __('WhatsApp') }}
-                                        </a>
-                                    @endif
+                                    <a id="sendTemplateBtn" href="{{ route('students.show', $current) }}#sectionMessages" class="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-green-600 text-white font-medium hover:bg-green-700">
+                                        {{ __('Send template') }}
+                                    </a>
                                     <button type="button" onclick="skipLead()" class="inline-flex items-center px-3 py-2 rounded-lg border border-gray-300 text-gray-700 text-sm hover:bg-gray-50">
                                         {{ __('Skip for now') }}
                                     </button>
@@ -120,6 +118,7 @@
                             </div>
                         </div>
                         <input type="hidden" id="currentLeadId" value="{{ $current->id }}">
+                        <input type="hidden" id="currentLeadNotConnectedAttempts" value="{{ (int) ($current->not_connected_attempts_count ?? 0) }}">
                     @else
                         <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-12 text-center">
                             <div class="text-4xl mb-4">🎉</div>
@@ -166,6 +165,7 @@
                                      data-calls="{{ (int) $s->total_calls }}"
                                      data-followup="{{ $s->next_followup_at ? $s->next_followup_at->format('d M, h:i A') : '' }}"
                                      data-overdue="{{ $s->next_followup_at && $s->next_followup_at->isPast() ? '1' : '0' }}"
+                                     data-not-connected-attempts="{{ (int) ($s->not_connected_attempts_count ?? 0) }}"
                                      data-notes="{{ $s->last_call_notes ? Str::limit($s->last_call_notes, 80) : '' }}"
                                      onclick="selectLead({{ $s->id }}, {{ $idx + 1 }})">
                                     <span class="w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold {{ $idx === 0 ? 'bg-emerald-600 text-white' : 'bg-gray-200 text-gray-700' }}">{{ $idx + 1 }}</span>
@@ -220,7 +220,14 @@
                 return;
             }
             try {
-                sessionStorage.setItem('pendingCallLog', JSON.stringify({ leadId: leadId, name: name, phone: '+91' + phone.slice(-10), setAt: Date.now() }));
+                const attempts = parseInt(document.getElementById('currentLeadNotConnectedAttempts')?.value || '0', 10) || 0;
+                sessionStorage.setItem('pendingCallLog', JSON.stringify({
+                    leadId: leadId,
+                    name: name,
+                    phone: '+91' + phone.slice(-10),
+                    notConnectedAttempts: attempts,
+                    setAt: Date.now()
+                }));
             } catch (e) {}
             window.location.href = 'tel:' + phone;
         }
@@ -243,6 +250,10 @@
             }
             const nameLink = document.getElementById('currentLeadNameLink');
             if (nameLink) nameLink.href = '{{ url("students") }}/' + leadId;
+            const sendTemplateBtn = document.getElementById('sendTemplateBtn');
+            if (sendTemplateBtn) sendTemplateBtn.href = '{{ url("students") }}/' + leadId + '#sectionMessages';
+            const attemptsInput = document.getElementById('currentLeadNotConnectedAttempts');
+            if (attemptsInput) attemptsInput.value = item.dataset.notConnectedAttempts || '0';
             const phone = item.dataset.phone || '';
             const phoneEl = document.getElementById('currentLeadPhone');
             if (phone) {
@@ -303,6 +314,10 @@
                     }
                     const nameLink = document.getElementById('currentLeadNameLink');
                     if (nameLink) nameLink.href = '{{ url("students") }}/' + L.id;
+                    const sendTemplateBtn = document.getElementById('sendTemplateBtn');
+                    if (sendTemplateBtn) sendTemplateBtn.href = '{{ url("students") }}/' + L.id + '#sectionMessages';
+                    const attemptsInput = document.getElementById('currentLeadNotConnectedAttempts');
+                    if (attemptsInput) attemptsInput.value = String(L.not_connected_attempts_count || 0);
                     const phoneEl = document.getElementById('currentLeadPhone');
                     if (L.mobile_number) {
                         phoneEl.innerHTML = '<a href="tel:' + (L.phone_raw || L.mobile_number).replace(/\D/g,'') + '" class="inline-flex items-center gap-1">' + L.mobile_number + '</a>';

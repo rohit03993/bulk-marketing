@@ -10,13 +10,11 @@ use Illuminate\Support\Carbon;
 /**
  * Call Queue (Start Calling): one-by-one lead view for telecallers.
  * Shows today's queue, one lead at a time; Call Now opens dialer then Log Call modal.
- * Excludes students with 3+ not-connected attempts in the last 7 days (same rule as follow-up cap).
+ * Excludes students with permanent block or 3+ not-connected attempts.
  */
 class CallQueueController extends Controller
 {
     private const MAX_NOT_CONNECTED_ATTEMPTS = 3;
-
-    private const NOT_CONNECTED_LOOKBACK_DAYS = 7;
 
     public function index(Request $request)
     {
@@ -94,9 +92,17 @@ class CallQueueController extends Controller
         $now = now();
 
         $query = Student::with(['classSection.school'])
+            ->withCount([
+                'calls as not_connected_attempts_count' => function ($q) {
+                    $q->whereIn('call_status', StudentCall::notConnectedStatuses());
+                },
+            ])
             ->where('assigned_to', $user->id)
             ->whereNotIn('lead_status', ['admission_done', 'not_interested'])
-            ->whereNotIn('id', $this->studentIdsExcludedByNotConnectedCap($user));
+            ->where(function ($q) {
+                $q->whereNull('is_call_blocked')->orWhere('is_call_blocked', false);
+            })
+            ->whereNotIn('id', $this->studentIdsExcludedByNotConnectedCap());
 
         // Never include future follow-ups (tomorrow/next days) in today's queue.
         $query->where(function ($q) use ($endOfToday) {
@@ -138,16 +144,12 @@ class CallQueueController extends Controller
     }
 
     /**
-     * Student IDs that have 3+ not-connected attempts in the last 7 days by this user.
-     * These are excluded from the call queue (same cap as follow-up scheduling).
+     * Student IDs that have 3+ not-connected attempts (global per student).
+     * These are excluded permanently from the call queue.
      */
-    private function studentIdsExcludedByNotConnectedCap($user): \Illuminate\Support\Collection
+    private function studentIdsExcludedByNotConnectedCap(): \Illuminate\Support\Collection
     {
-        $cutoff = now()->subDays(self::NOT_CONNECTED_LOOKBACK_DAYS);
-
-        return StudentCall::where('user_id', $user->id)
-            ->whereIn('call_status', StudentCall::notConnectedStatuses())
-            ->where('called_at', '>=', $cutoff)
+        return StudentCall::whereIn('call_status', StudentCall::notConnectedStatuses())
             ->select('student_id')
             ->groupBy('student_id')
             ->havingRaw('COUNT(*) >= ?', [self::MAX_NOT_CONNECTED_ATTEMPTS])
@@ -168,6 +170,9 @@ class CallQueueController extends Controller
             ->whereNotNull('next_followup_at')
             ->where('next_followup_at', '<=', now())
             ->whereNotIn('lead_status', ['admission_done', 'not_interested'])
+            ->where(function ($q) {
+                $q->whereNull('is_call_blocked')->orWhere('is_call_blocked', false);
+            })
             ->count();
         $queueCount = $this->getTodayQueue($user)->count();
 
@@ -209,6 +214,7 @@ class CallQueueController extends Controller
             'next_followup_at' => $student->next_followup_at?->format('d M, h:i A'),
             'school_class' => $student->classSection ? $student->classSection->full_name . ' (' . ($student->classSection->school?->name ?? '') . ')' : '',
             'is_overdue' => $student->next_followup_at && $student->next_followup_at->isPast(),
+            'not_connected_attempts_count' => (int) ($student->not_connected_attempts_count ?? 0),
         ];
     }
 }

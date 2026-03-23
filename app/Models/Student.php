@@ -29,6 +29,9 @@ class Student extends Model
         'last_call_status',
         'last_call_notes',
         'next_followup_at',
+        'is_call_blocked',
+        'blocked_reason',
+        'blocked_at',
         'meta',
     ];
 
@@ -37,6 +40,8 @@ class Student extends Model
         'assigned_at' => 'datetime',
         'last_call_at' => 'datetime',
         'next_followup_at' => 'datetime',
+        'blocked_at' => 'datetime',
+        'is_call_blocked' => 'boolean',
     ];
 
     public function classSection()

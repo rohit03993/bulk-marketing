@@ -212,6 +212,9 @@ class StudentLeadController extends Controller
         // Not connected today (separate list)
         $notConnectedToday = Student::with(['classSection.school'])
             ->where('assigned_to', $user->id)
+            ->where(function ($q) {
+                $q->whereNull('is_call_blocked')->orWhere('is_call_blocked', false);
+            })
             ->whereDate('last_call_at', $now->toDateString())
             ->whereIn('last_call_status', $notConnectedStatuses)
             ->orderByDesc('last_call_at')
@@ -223,6 +226,9 @@ class StudentLeadController extends Controller
         // Due or overdue follow-ups (today and earlier)
         $dueQuery = Student::with(['classSection.school'])
             ->where('assigned_to', $user->id)
+            ->where(function ($q) {
+                $q->whereNull('is_call_blocked')->orWhere('is_call_blocked', false);
+            })
             ->whereIn('lead_status', $followupLeadStatuses)
             ->whereNotNull('next_followup_at')
             ->where('next_followup_at', '<=', $endOfToday)
@@ -242,6 +248,9 @@ class StudentLeadController extends Controller
         // Upcoming follow-ups in the next N days (excluding today)
         $upcomingQuery = Student::with(['classSection.school'])
             ->where('assigned_to', $user->id)
+            ->where(function ($q) {
+                $q->whereNull('is_call_blocked')->orWhere('is_call_blocked', false);
+            })
             ->whereIn('lead_status', $followupLeadStatuses)
             ->whereNotNull('next_followup_at')
             ->whereBetween('next_followup_at', [$endOfToday->copy()->addSecond(), $upcomingUntil])

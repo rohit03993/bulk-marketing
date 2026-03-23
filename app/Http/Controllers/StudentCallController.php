@@ -21,9 +21,7 @@ class StudentCallController extends Controller
     private const TERMINAL_LEAD_STATUSES = ['not_interested', 'admission_done'];
 
 
-    private const MAX_NOT_CONNECTED_ATTEMPTS = 3; // within the lookback window
-
-    private const NOT_CONNECTED_LOOKBACK_DAYS = 7;
+    private const MAX_NOT_CONNECTED_ATTEMPTS = 3; // permanent cap
 
     /**
      * Store a new call against a student. Supports both legacy form and Log Call Result wizard.
@@ -113,6 +111,21 @@ class StudentCallController extends Controller
         if ($newLeadStatus) {
             $student->lead_status = $newLeadStatus;
         }
+        if ($newLeadStatus === 'not_interested') {
+            $student->next_followup_at = null;
+            $this->applyPermanentBlock($student, 'not_interested');
+        } elseif ($newLeadStatus === 'admission_done') {
+            $student->next_followup_at = null;
+        }
+        if (in_array($callStatus, StudentCall::notConnectedStatuses(), true)) {
+            $failedAttemptsTotal = StudentCall::where('student_id', $student->id)
+                ->whereIn('call_status', StudentCall::notConnectedStatuses())
+                ->count();
+            if ($failedAttemptsTotal >= self::MAX_NOT_CONNECTED_ATTEMPTS) {
+                $student->next_followup_at = null;
+                $this->applyPermanentBlock($student, 'max_not_connected_attempts');
+            }
+        }
         if (! $student->assigned_to) {
             $student->assigned_to = $user->id;
             $student->assigned_by = $user->id;
@@ -175,7 +188,7 @@ class StudentCallController extends Controller
      * - Only leads in FOLLOWUP_LEAD_STATUSES get a future follow-up.
      * - Terminal lead statuses never get a follow-up.
      * - Not-connected calls schedule follow-up only up to MAX_NOT_CONNECTED_ATTEMPTS
-     *   within NOT_CONNECTED_LOOKBACK_DAYS for this telecaller + student.
+     *   for this student (permanent cap).
      */
     protected function determineNextFollowupAt(
         Student $student,
@@ -202,14 +215,10 @@ class StudentCallController extends Controller
             return $now->copy()->addDay()->setHour(10)->setMinute(0)->setSecond(0);
         }
 
-        // Not-connected: only schedule while attempts are under the cap.
+        // Not-connected: only schedule while attempts are under the permanent cap.
         if (in_array($callStatus, StudentCall::notConnectedStatuses(), true)) {
-            $lookbackFrom = $now->copy()->subDays(self::NOT_CONNECTED_LOOKBACK_DAYS);
-
             $failedAttempts = StudentCall::where('student_id', $student->id)
-                ->where('user_id', $user->id)
                 ->whereIn('call_status', StudentCall::notConnectedStatuses())
-                ->whereBetween('called_at', [$lookbackFrom, $now])
                 ->count();
 
             if ($failedAttempts >= self::MAX_NOT_CONNECTED_ATTEMPTS) {
@@ -307,6 +316,15 @@ class StudentCallController extends Controller
             case StudentCall::STATUS_CONNECTED:
             default:
                 return null;
+        }
+    }
+
+    protected function applyPermanentBlock(Student $student, string $reason): void
+    {
+        $student->is_call_blocked = true;
+        $student->blocked_reason = $reason;
+        if (! $student->blocked_at) {
+            $student->blocked_at = Carbon::now();
         }
     }
 }

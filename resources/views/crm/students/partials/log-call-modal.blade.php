@@ -138,7 +138,7 @@
 <script>
 (function() {
     var PENDING_CALL_MAX_AGE_MS = 15 * 60 * 1000;
-    let logCallData = { leadId: null, connected: null, whoAnswered: null, leadStatus: null, callStatus: null, tags: [], requiresFollowup: true };
+    let logCallData = { leadId: null, connected: null, whoAnswered: null, leadStatus: null, callStatus: null, tags: [], requiresFollowup: true, notConnectedAttempts: 0 };
 
     function hide(el) {
         if (el) { el.classList.add('hidden'); el.style.display = 'none'; }
@@ -148,7 +148,7 @@
     }
 
     function resetLogCallWizard() {
-        logCallData = { leadId: null, connected: null, whoAnswered: null, leadStatus: null, callStatus: null, tags: [], requiresFollowup: true, direction: 'outgoing' };
+        logCallData = { leadId: null, connected: null, whoAnswered: null, leadStatus: null, callStatus: null, tags: [], requiresFollowup: true, notConnectedAttempts: 0, direction: 'outgoing' };
         var form = document.getElementById('quickCallForm');
         if (form) form.reset();
         var f = document.getElementById('callConnectedField'); if (f) f.value = '';
@@ -177,10 +177,11 @@
         if (header) { header.classList.remove('bg-amber-600'); header.classList.add('bg-indigo-600'); }
     }
 
-    window.openQuickCallModal = function(leadId, leadName, leadPhone, direction) {
+    window.openQuickCallModal = function(leadId, leadName, leadPhone, direction, notConnectedAttempts) {
         resetLogCallWizard();
         logCallData.leadId = leadId;
         logCallData.direction = direction || 'outgoing';
+        logCallData.notConnectedAttempts = parseInt(notConnectedAttempts || 0, 10) || 0;
         var dirField = document.getElementById('callDirectionField');
         if (dirField) dirField.value = logCallData.direction;
         var nameEl = document.getElementById('logCallLeadName');
@@ -236,18 +237,32 @@
             show(step2Conn);
             hide(step2Not);
             show(stepTags);
+            logCallData.callStatus = null;
+            const callStatusField = document.getElementById('callStatusField');
+            if (callStatusField) callStatusField.value = '';
+            logCallData.requiresFollowup = !['not_interested','admission_done'].includes(logCallData.leadStatus);
             if (notesStar) notesStar.style.display = 'inline';
             if (notesHint) notesHint.textContent = '{{ __("Minimum 10 characters required") }}';
         } else {
             hide(step2Conn);
             show(step2Not);
             hide(stepTags);
+            if (logCallData.callStatus) {
+                const projectedAttempts = (logCallData.notConnectedAttempts || 0) + 1;
+                logCallData.requiresFollowup = (logCallData.callStatus !== 'wrong_number') && (projectedAttempts < 3);
+            } else {
+                logCallData.requiresFollowup = true;
+            }
             if (notesStar) notesStar.style.display = 'none';
             if (notesHint) notesHint.textContent = '{{ __("Optional for not connected") }}';
         }
         show(stepDur);
         show(stepNotes);
-        show(stepFup);
+        if (logCallData.requiresFollowup) {
+            show(stepFup);
+        } else {
+            hide(stepFup);
+        }
         show(submitSec);
 
         suggestFollowup();
@@ -282,6 +297,8 @@
             logCallData.requiresFollowup = !['not_interested','admission_done'].includes(v);
             document.querySelectorAll('.status-btn').forEach(b => { b.classList.remove('bg-indigo-600','text-white'); b.classList.add('border-gray-300'); });
             this.classList.add('bg-indigo-600','text-white'); this.classList.remove('border-gray-300');
+            const stepFup = document.getElementById('step5Followup');
+            if (logCallData.requiresFollowup) show(stepFup); else hide(stepFup);
             suggestFollowup();
         });
     });
@@ -290,9 +307,12 @@
             const v = this.dataset.value;
             logCallData.callStatus = v;
             document.getElementById('callStatusField').value = v;
-            logCallData.requiresFollowup = v !== 'wrong_number';
+            const projectedAttempts = (logCallData.notConnectedAttempts || 0) + 1;
+            logCallData.requiresFollowup = (v !== 'wrong_number') && (projectedAttempts < 3);
             document.querySelectorAll('.reason-btn').forEach(b => { b.classList.remove('bg-indigo-600','text-white'); b.classList.add('border-gray-300'); });
             this.classList.add('bg-indigo-600','text-white'); this.classList.remove('border-gray-300');
+            const stepFup = document.getElementById('step5Followup');
+            if (logCallData.requiresFollowup) show(stepFup); else hide(stepFup);
             suggestFollowup();
         });
     });
@@ -462,7 +482,7 @@
                 sessionStorage.removeItem('pendingCallLog');
                 var id = parseInt(d.leadId, 10);
                 if (!isNaN(id) && id > 0 && typeof openQuickCallModal === 'function') {
-                    openQuickCallModal(id, d.name || '', d.phone || '');
+                    openQuickCallModal(id, d.name || '', d.phone || '', 'outgoing', parseInt(d.notConnectedAttempts || 0, 10) || 0);
                 }
             } catch (e) {}
         }
