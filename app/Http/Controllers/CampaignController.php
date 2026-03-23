@@ -12,6 +12,7 @@ use App\Models\School;
 use App\Models\Setting;
 use App\Models\Student;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 
 class CampaignController extends Controller
 {
@@ -109,7 +110,39 @@ class CampaignController extends Controller
             'aisensy_template_id' => 'required|exists:aisensy_templates,id',
             'class_section_ids' => 'required|array',
             'class_section_ids.*' => 'exists:class_sections,id',
+            'media_type' => 'nullable|in:image,video,document',
+            'media_url' => 'nullable|url|max:2048',
+            'media_filename' => 'nullable|string|max:255',
+            'media_upload' => 'nullable|file|mimes:jpg,jpeg,png|max:5120',
         ]);
+
+        $mediaType = $valid['media_type'] ?? null;
+        $mediaUrl = $valid['media_url'] ?? null;
+        $mediaFilename = $valid['media_filename'] ?? null;
+
+        if ($request->hasFile('media_upload')) {
+            if ($mediaType !== null && $mediaType !== 'image') {
+                return back()->withErrors([
+                    'media_upload' => __('Uploaded file is allowed only for Image media type.'),
+                ])->withInput();
+            }
+
+            $file = $request->file('media_upload');
+            $storedPath = $file->store('campaign-media/' . now()->format('Y/m'), 'public');
+            $mediaUrl = Storage::url($storedPath);
+            $mediaType = 'image';
+            if (empty($mediaFilename)) {
+                $mediaFilename = $file->getClientOriginalName();
+            }
+        }
+
+        // If user selected a media type but didn't upload a file (and URL is not provided),
+        // enforce upload (we removed URL option from the UI).
+        if ($mediaType && empty($mediaUrl) && ! $request->hasFile('media_upload')) {
+            return back()->withErrors([
+                'media_upload' => __('Please upload an image (JPG/JPEG/PNG) with size <= 5MB.'),
+            ])->withInput();
+        }
 
         $template = AisensyTemplate::findOrFail($valid['aisensy_template_id']);
         $students = Student::whereIn('class_section_id', $valid['class_section_ids'])
@@ -133,6 +166,9 @@ class CampaignController extends Controller
 
         $campaign = Campaign::create([
             'name' => $valid['name'],
+            'media_type' => $mediaType,
+            'media_url' => $mediaUrl,
+            'media_filename' => $mediaFilename,
             'school_id' => $valid['school_id'],
             'academic_session_id' => $valid['academic_session_id'] ?? null,
             'aisensy_template_id' => $valid['aisensy_template_id'],

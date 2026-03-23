@@ -65,6 +65,25 @@
                 </div>
             @endif
 
+            @if (!empty($campaign->media_url))
+                <div class="bg-violet-50 border border-violet-200 rounded-lg p-3 text-sm text-violet-900">
+                    <p class="font-medium">{{ __('Campaign media') }}</p>
+                    <p class="mt-1">
+                        <span class="font-medium">{{ __('Type:') }}</span>
+                        {{ ucfirst((string) ($campaign->media_type ?? 'media')) }}
+                        @if (!empty($campaign->media_filename))
+                            · <span class="font-medium">{{ __('File:') }}</span> {{ $campaign->media_filename }}
+                        @endif
+                    </p>
+                    <p class="mt-1 break-all">
+                        <span class="font-medium">{{ __('URL:') }}</span>
+                        <a href="{{ $campaign->media_url }}" target="_blank" rel="noopener" class="underline hover:text-violet-700">
+                            {{ $campaign->media_url }}
+                        </a>
+                    </p>
+                </div>
+            @endif
+
             @if ($campaign->status === 'completed' && $campaign->started_at && $campaign->finished_at)
                 @php
                     // Strict duration math: end timestamp minus start timestamp.

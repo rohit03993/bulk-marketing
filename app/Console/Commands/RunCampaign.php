@@ -52,6 +52,13 @@ class RunCampaign extends Command
 
         $template = $campaign->template;
         $paramSources = $template->getParamSources();
+        $campaignMedia = null;
+        if (! empty($campaign->media_url)) {
+            $campaignMedia = [
+                'url' => (string) $campaign->media_url,
+                'filename' => (string) ($campaign->media_filename ?: ('campaign-media-' . $campaign->id)),
+            ];
+        }
 
         $shotByUser = $campaign->shot_by ? User::find($campaign->shot_by) : null;
 
@@ -84,7 +91,7 @@ class RunCampaign extends Command
                 $templateParams[] = $this->resolveParamSource($source, $student, $classSection, $school, $session, $shotByUser);
             }
 
-            $result = $aisensy->send($recipient->phone, $templateParams, $template->name);
+            $result = $aisensy->send($recipient->phone, $templateParams, $template->name, $campaignMedia);
 
             $recipient->template_params = $templateParams;
             $recipient->message_sent = $this->buildMessageSent($template->body, $templateParams);

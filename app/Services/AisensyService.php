@@ -22,7 +22,7 @@ class AisensyService
         );
     }
 
-    public function send(string $phone, array $templateParams = [], ?string $templateName = null): array
+    public function send(string $phone, array $templateParams = [], ?string $templateName = null, ?array $media = null): array
     {
         if (empty($this->apiKey) || empty($this->apiUrl)) {
             return ['status' => 'failed', 'error' => 'Aisensy API key or URL not configured.'];
@@ -47,6 +47,12 @@ class AisensyService
             'userName' => $userName,
             'templateParams' => $templateParams,
         ];
+        if (! empty($media['url'])) {
+            $payload['media'] = [
+                'url' => (string) $media['url'],
+                'filename' => (string) ($media['filename'] ?? 'media'),
+            ];
+        }
 
         Log::info('AIsensy request', [
             'url' => $url,
@@ -54,6 +60,7 @@ class AisensyService
             'destination' => $phone,
             'userName' => $userName,
             'templateParams' => $templateParams,
+            'has_media' => isset($payload['media']),
         ]);
 
         try {
