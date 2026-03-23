@@ -59,8 +59,12 @@ class RunCampaign extends Command
         $paramSources = $template->getParamSources();
         $campaignMedia = null;
         if (! empty($campaign->media_url)) {
+            $resolvedMediaUrl = (string) $campaign->media_url;
+            if (str_starts_with($resolvedMediaUrl, '/')) {
+                $resolvedMediaUrl = url($resolvedMediaUrl);
+            }
             $campaignMedia = [
-                'url' => (string) $campaign->media_url,
+                'url' => $resolvedMediaUrl,
                 'filename' => (string) ($campaign->media_filename ?: ('campaign-media-' . $campaign->id)),
             ];
         }

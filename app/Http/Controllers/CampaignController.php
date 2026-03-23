@@ -129,7 +129,7 @@ class CampaignController extends Controller
 
             $file = $request->file('media_upload');
             $storedPath = $file->store('campaign-media/' . now()->format('Y/m'), 'public');
-            $mediaUrl = Storage::url($storedPath);
+            $mediaUrl = url(Storage::url($storedPath));
             $mediaType = 'image';
             if (empty($mediaFilename)) {
                 $mediaFilename = $file->getClientOriginalName();
