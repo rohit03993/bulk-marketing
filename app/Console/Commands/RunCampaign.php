@@ -39,6 +39,11 @@ class RunCampaign extends Command
 
             return self::SUCCESS;
         }
+        if ($campaign->status === 'paused') {
+            $this->info('Campaign is paused. Skipping run.');
+
+            return self::SUCCESS;
+        }
 
         if ($campaign->status === 'draft') {
             $campaign->status = 'queued';
@@ -137,6 +142,11 @@ class RunCampaign extends Command
             $this->info('Campaign completed.');
         } else {
             $campaign->refresh();
+            if ($campaign->status === 'paused') {
+                $this->info('Campaign paused. Next batch will not be queued.');
+
+                return self::SUCCESS;
+            }
             $campaign->status = 'running';
             $campaign->save();
 

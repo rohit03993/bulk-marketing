@@ -5,14 +5,32 @@
                 <a href="{{ route('campaigns.index') }}" class="text-gray-500 hover:text-gray-700">←</a>
                 <h2 class="font-semibold text-xl text-gray-800 leading-tight">{{ $campaign->name }}</h2>
             </div>
-            @if ($campaign->status === 'draft' && $campaign->recipients()->where('status', 'pending')->exists())
-                <form method="POST" action="{{ route('campaigns.shoot', $campaign) }}" class="inline">
-                    @csrf
-                    <button type="submit" class="inline-flex items-center px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-md hover:bg-green-700">
-                        {{ __('Shoot campaign') }}
-                    </button>
-                </form>
-            @endif
+            <div class="flex items-center gap-2">
+                @if ($campaign->status === 'draft' && $campaign->recipients()->where('status', 'pending')->exists())
+                    <form method="POST" action="{{ route('campaigns.shoot', $campaign) }}" class="inline">
+                        @csrf
+                        <button type="submit" class="inline-flex items-center px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-md hover:bg-green-700">
+                            {{ __('Shoot campaign') }}
+                        </button>
+                    </form>
+                @endif
+                @if (in_array($campaign->status, ['queued', 'running']) && $campaign->recipients()->where('status', 'pending')->exists())
+                    <form method="POST" action="{{ route('campaigns.stop', $campaign) }}" class="inline" onsubmit="return confirm('{{ __('Pause this campaign? Current message in processing may complete, then sending will stop.') }}')">
+                        @csrf
+                        <button type="submit" class="inline-flex items-center px-4 py-2 bg-amber-600 text-white text-sm font-medium rounded-md hover:bg-amber-700">
+                            {{ __('Stop') }}
+                        </button>
+                    </form>
+                @endif
+                @if ($campaign->status === 'paused' && $campaign->recipients()->where('status', 'pending')->exists())
+                    <form method="POST" action="{{ route('campaigns.resume', $campaign) }}" class="inline">
+                        @csrf
+                        <button type="submit" class="inline-flex items-center px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-md hover:bg-indigo-700">
+                            {{ __('Resume / Resend Pending') }}
+                        </button>
+                    </form>
+                @endif
+            </div>
         </div>
     </x-slot>
 

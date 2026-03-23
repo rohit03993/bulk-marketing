@@ -249,6 +249,40 @@ class CampaignController extends Controller
             ->with('success', __('Sending started. Counts will update in real time.'));
     }
 
+    public function stop(Campaign $campaign)
+    {
+        $pending = $campaign->recipients()->where('status', 'pending')->exists();
+        if (! $pending) {
+            return redirect()->route('campaigns.show', $campaign)
+                ->with('info', __('No pending recipients left. Campaign is already finished.'));
+        }
+
+        $campaign->update(['status' => 'paused']);
+
+        return redirect()->route('campaigns.show', $campaign)
+            ->with('success', __('Campaign paused. No new batch will be queued.'));
+    }
+
+    public function resume(Campaign $campaign)
+    {
+        $pending = $campaign->recipients()->where('status', 'pending')->exists();
+        if (! $pending) {
+            return redirect()->route('campaigns.show', $campaign)
+                ->with('info', __('No pending recipients to resume.'));
+        }
+
+        $campaign->update([
+            'status' => 'queued',
+            'shot_by' => auth()->id(),
+            'shot_at' => now(),
+        ]);
+
+        RunCampaignJob::dispatch($campaign->id);
+
+        return redirect()->route('campaigns.show', $campaign)
+            ->with('success', __('Campaign resumed from pending recipients.'));
+    }
+
     public function stats(Campaign $campaign)
     {
         $campaign->refresh();

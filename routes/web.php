@@ -240,6 +240,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('campaigns', [CampaignController::class, 'store'])->name('campaigns.store');
         Route::get('campaigns/stats', [CampaignController::class, 'statsBulk'])->name('campaigns.stats.bulk');
         Route::post('campaigns/{campaign}/shoot', [CampaignController::class, 'shoot'])->name('campaigns.shoot');
+        Route::post('campaigns/{campaign}/stop', [CampaignController::class, 'stop'])->name('campaigns.stop');
+        Route::post('campaigns/{campaign}/resume', [CampaignController::class, 'resume'])->name('campaigns.resume');
         Route::get('campaigns/{campaign}/stats', [CampaignController::class, 'stats'])->name('campaigns.stats');
         Route::get('campaigns/{campaign}', [CampaignController::class, 'show'])->name('campaigns.show');
     });
