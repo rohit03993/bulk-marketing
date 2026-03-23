@@ -9,6 +9,7 @@ use App\Jobs\RunCampaignJob;
 use App\Models\CampaignRecipient;
 use App\Models\ClassSection;
 use App\Models\School;
+use App\Models\Setting;
 use App\Models\Student;
 use Illuminate\Http\Request;
 
@@ -167,7 +168,24 @@ class CampaignController extends Controller
         }
         $recipients = $campaign->recipients()->with('student')->paginate(50);
 
-        return view('crm.campaigns.show', compact('campaign', 'recipients', 'pendingCount'));
+        $campaignBatchSize = max(1, (int) Setting::get('campaign_batch_size', (string) config('campaigns.batch_size', 10)));
+        $campaignDelayMinutes = max(
+            0,
+            (int) Setting::get(
+                'campaign_next_batch_delay_minutes',
+                (string) max(0, (int) round(((int) config('campaigns.next_batch_delay_seconds', 300)) / 60))
+            )
+        );
+        $showBulkTiming = (int) ($campaign->total_recipients ?? 0) > 1;
+
+        return view('crm.campaigns.show', compact(
+            'campaign',
+            'recipients',
+            'pendingCount',
+            'campaignBatchSize',
+            'campaignDelayMinutes',
+            'showBulkTiming'
+        ));
     }
 
     public function shoot(Campaign $campaign)

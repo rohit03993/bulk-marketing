@@ -5,15 +5,15 @@ namespace App\Console\Commands;
 use App\Jobs\RunCampaignJob;
 use App\Models\Campaign;
 use App\Models\CampaignRecipient;
+use App\Models\Setting;
 use App\Models\StudentCall;
 use App\Models\User;
 use App\Services\AisensyService;
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\DB;
 
 class RunCampaign extends Command
 {
-    protected $signature = 'campaigns:run {campaign} {--batch=200 : Max recipients to process per run}';
+    protected $signature = 'campaigns:run {campaign} {--batch= : Max recipients to process per run}';
 
     protected $description = 'Send pending messages for a campaign via Aisensy (batched for large campaigns)';
 
@@ -22,8 +22,13 @@ class RunCampaign extends Command
         set_time_limit(0);
 
         $campaignId = (int) $this->argument('campaign');
-        $batchSize = (int) $this->option('batch');
-        $batchSize = $batchSize > 0 ? $batchSize : 200;
+        $batchSizeFromSettings = (int) Setting::get('campaign_batch_size', (string) config('campaigns.batch_size', 10));
+        $batchOption = $this->option('batch');
+        $batchSize = is_numeric($batchOption) ? (int) $batchOption : 0;
+        $batchSize = $batchSize > 0 ? $batchSize : $batchSizeFromSettings;
+        if ($batchSize < 1) {
+            $batchSize = 10;
+        }
 
         /** @var Campaign $campaign */
         $campaign = Campaign::with(['template', 'school', 'academicSession', 'recipients.student.classSection.school', 'recipients.student.classSection.academicSession'])
@@ -57,6 +62,7 @@ class RunCampaign extends Command
 
         $sent = 0;
         $failed = 0;
+        $processedInBatch = 0;
 
         foreach ($pending as $recipient) {
             /** @var CampaignRecipient $recipient */
@@ -102,6 +108,9 @@ class RunCampaign extends Command
                     'whatsapp_auto_status' => $recipient->status === 'sent' ? 'success' : 'failed',
                 ]);
             }
+
+            $processedInBatch++;
+            $this->maybePauseAfterChunk($processedInBatch);
         }
 
         $sentCount = CampaignRecipient::where('campaign_id', $campaign->id)->where('status', 'sent')->count();
@@ -124,14 +133,49 @@ class RunCampaign extends Command
             $campaign->status = 'running';
             $campaign->save();
 
-            RunCampaignJob::dispatch($campaign->id);
+            $delayMinutes = (int) Setting::get(
+                'campaign_next_batch_delay_minutes',
+                (string) max(0, (int) round(((int) config('campaigns.next_batch_delay_seconds', 0)) / 60))
+            );
+            $delaySeconds = max(0, $delayMinutes) * 60;
+            if ($delaySeconds > 0) {
+                RunCampaignJob::dispatch($campaign->id)->delay(now()->addSeconds($delaySeconds));
+            } else {
+                RunCampaignJob::dispatch($campaign->id);
+            }
 
-            $this->info("Campaign still has {$remaining} pending recipients. Next batch queued.");
+            $this->info("Campaign still has {$remaining} pending recipients. Next batch queued" . ($delaySeconds > 0 ? " with {$delaySeconds}s delay." : '.'));
         }
 
         $this->info("Sent: {$sent}, Failed: {$failed}");
 
         return self::SUCCESS;
+    }
+
+    /**
+     * Light throttle: pause briefly after every N messages in this batch.
+     * Controlled by config/campaigns.php and .env (CAMPAIGN_PAUSE_*).
+     */
+    protected function maybePauseAfterChunk(int $processedInBatch): void
+    {
+        $every = (int) config('campaigns.pause_after_messages', 0);
+        if ($every < 1) {
+            return;
+        }
+
+        if ($processedInBatch % $every !== 0) {
+            return;
+        }
+
+        $seconds = (float) config('campaigns.pause_seconds', 0);
+        if ($seconds <= 0) {
+            return;
+        }
+
+        $micros = (int) round($seconds * 1_000_000);
+        if ($micros > 0) {
+            usleep($micros);
+        }
     }
 
     protected function buildMessageSent(?string $body, array $templateParams): ?string

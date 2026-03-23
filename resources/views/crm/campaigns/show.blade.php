@@ -16,7 +16,14 @@
         </div>
     </x-slot>
 
-    <div class="py-6" data-campaign-id="{{ $campaign->id }}" data-stats-url="{{ route('campaigns.stats', $campaign) }}">
+    <div
+        class="py-6"
+        data-campaign-id="{{ $campaign->id }}"
+        data-stats-url="{{ route('campaigns.stats', $campaign) }}"
+        data-batch-size="{{ (int) ($campaignBatchSize ?? 10) }}"
+        data-batch-delay-minutes="{{ (int) ($campaignDelayMinutes ?? 5) }}"
+        data-started-at="{{ optional($campaign->started_at ?? $campaign->shot_at)->toIso8601String() }}"
+    >
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8 space-y-4">
             @if (session('success'))
                 <div class="rounded-md bg-green-50 p-4 text-sm text-green-800">{{ session('success') }}</div>
@@ -58,11 +65,69 @@
                 </div>
             @endif
 
+            @if ($campaign->status === 'completed' && $campaign->started_at && $campaign->finished_at)
+                @php
+                    // Strict duration math: end timestamp minus start timestamp.
+                    $durationSeconds = max(0, $campaign->finished_at->getTimestamp() - $campaign->started_at->getTimestamp());
+                    $durationHours = intdiv($durationSeconds, 3600);
+                    $durationMinutes = intdiv($durationSeconds % 3600, 60);
+                    $durationRemainSeconds = $durationSeconds % 60;
+                    $durationLabel = '';
+                    if ($durationHours > 0) {
+                        $durationLabel .= $durationHours . 'h ';
+                    }
+                    if ($durationMinutes > 0 || $durationHours > 0) {
+                        $durationLabel .= $durationMinutes . 'm ';
+                    }
+                    $durationLabel .= $durationRemainSeconds . 's';
+                @endphp
+                <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-4 text-sm text-emerald-900">
+                    <p class="font-semibold">{{ __('Campaign timing summary') }}</p>
+                    <div class="mt-2 grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs sm:text-sm">
+                        <p><span class="font-medium">{{ __('Start time:') }}</span> {{ $campaign->started_at->format('d M Y, h:i A') }}</p>
+                        <p><span class="font-medium">{{ __('End time:') }}</span> {{ $campaign->finished_at->format('d M Y, h:i A') }}</p>
+                        <p><span class="font-medium">{{ __('Total time:') }}</span> {{ trim($durationLabel) }}</p>
+                    </div>
+                </div>
+            @endif
+
             @if ($pendingCount > 0)
                 <div id="campaign-progress-section" class="space-y-4">
                     <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm text-blue-800">
                         {{ __('Sending in progress. Counts update automatically.') }}
                     </div>
+                    @if ($showBulkTiming)
+                        <div id="campaign-timing-estimate" class="bg-indigo-50 border border-indigo-200 rounded-lg p-4 text-sm text-indigo-900">
+                            <p class="font-medium">{{ __('Bulk sending schedule') }}</p>
+                            <p class="mt-1">
+                                {{ __('Configured pace:') }}
+                                <strong>{{ (int) ($campaignBatchSize ?? 10) }}</strong>
+                                {{ __('messages per run,') }}
+                                <strong>{{ (int) ($campaignDelayMinutes ?? 5) }}</strong>
+                                {{ __('minute gap before the next run.') }}
+                            </p>
+                            <p class="mt-1">
+                                {{ __('Estimated remaining runs:') }}
+                                <strong id="campaign-estimated-runs">{{ max(1, (int) ceil((int) ($pendingCount ?? 0) / max(1, (int) ($campaignBatchSize ?? 10)))) }}</strong>
+                                ·
+                                {{ __('Estimated minimum wait (gaps only):') }}
+                                <strong id="campaign-estimated-wait">
+                                    @php
+                                        $initialRuns = max(1, (int) ceil((int) ($pendingCount ?? 0) / max(1, (int) ($campaignBatchSize ?? 10))));
+                                        $initialGapMinutes = max(0, $initialRuns - 1) * (int) ($campaignDelayMinutes ?? 5);
+                                    @endphp
+                                    {{ $initialGapMinutes }} {{ __('min') }}
+                                </strong>
+                            </p>
+                            <p class="mt-1 text-xs text-indigo-800/80">
+                                {{ __('This estimate is for bulk campaigns only and excludes provider/API processing time.') }}
+                            </p>
+                            <p class="mt-1">
+                                {{ __('Estimated completion at (IST):') }}
+                                <strong id="campaign-estimated-completion-at">—</strong>
+                            </p>
+                        </div>
+                    @endif
                     @if ($campaign->status === 'queued' && $campaign->sent_count === 0 && $campaign->failed_count === 0)
                     <div class="bg-amber-50 border border-amber-300 rounded-lg p-4 text-sm text-amber-900">
                         <p class="font-medium">{{ __('Queue not running?') }}</p>
@@ -138,9 +203,49 @@
             const el = document.querySelector('[data-stats-url]');
             if (!el) return;
             const statsUrl = el.dataset.statsUrl;
+            const batchSize = Math.max(1, parseInt(el.dataset.batchSize || '10', 10));
+            const batchDelayMinutes = Math.max(0, parseInt(el.dataset.batchDelayMinutes || '0', 10));
+            const startedAtIso = el.dataset.startedAt || '';
             const set = (attr, value) => {
                 const node = document.querySelector('[data-stat="' + attr + '"]');
                 if (node) node.textContent = value;
+            };
+            const formatDateTimeIST = (d) => new Intl.DateTimeFormat('en-IN', {
+                timeZone: 'Asia/Kolkata',
+                day: '2-digit',
+                month: 'short',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: true,
+            }).format(d);
+            const updateTimingEstimate = (pendingCount) => {
+                const runsNode = document.getElementById('campaign-estimated-runs');
+                const waitNode = document.getElementById('campaign-estimated-wait');
+                const completionAtNode = document.getElementById('campaign-estimated-completion-at');
+                if (!runsNode || !waitNode || !completionAtNode) return;
+                if (pendingCount <= 0) {
+                    runsNode.textContent = '0';
+                    waitNode.textContent = '0 min';
+                    completionAtNode.textContent = '{{ __("Completed") }}';
+                    return;
+                }
+                const runs = Math.ceil(pendingCount / batchSize);
+                const gapMinutes = Math.max(0, runs - 1) * batchDelayMinutes;
+                runsNode.textContent = String(runs);
+                waitNode.textContent = String(gapMinutes) + ' min';
+
+                const start = startedAtIso ? new Date(startedAtIso) : null;
+                if (!start || Number.isNaN(start.getTime())) {
+                    completionAtNode.textContent = '—';
+                    return;
+                }
+
+                // Use live remaining gap estimate so completion time doesn't drift into the past
+                // while campaign still has pending recipients.
+                const now = new Date();
+                const estimatedEnd = new Date(now.getTime() + (gapMinutes * 60 * 1000));
+                completionAtNode.textContent = formatDateTimeIST(estimatedEnd);
             };
             const poll = () => {
                 fetch(statsUrl, { headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' } })
@@ -151,6 +256,7 @@
                         set('total_recipients', data.total_recipients);
                         set('status', data.status);
                         if (data.pending_count !== undefined) set('pending_count', data.pending_count);
+                        updateTimingEstimate(parseInt(data.pending_count || 0, 10));
                         if ((data.pending_count || 0) === 0) {
                             document.querySelector('[data-stat-wrap="pending_count"]')?.remove();
                         }

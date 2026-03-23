@@ -13,8 +13,8 @@ class RunCampaignJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    /** Allow up to 5 minutes per batch (e.g. 200 messages). */
-    public int $timeout = 300;
+    /** Allow up to 15 minutes per batch when throttling is enabled. */
+    public int $timeout = 900;
 
     public int $tries = 3;
 
