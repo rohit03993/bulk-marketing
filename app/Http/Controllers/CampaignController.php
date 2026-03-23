@@ -110,7 +110,7 @@ class CampaignController extends Controller
             'aisensy_template_id' => 'required|exists:aisensy_templates,id',
             'class_section_ids' => 'required|array',
             'class_section_ids.*' => 'exists:class_sections,id',
-            'media_type' => 'nullable|in:image,video,document',
+            'media_type' => 'nullable|in:image',
             'media_url' => 'nullable|url|max:2048',
             'media_filename' => 'nullable|string|max:255',
             'media_upload' => 'nullable|file|mimes:jpg,jpeg,png|max:5120',
