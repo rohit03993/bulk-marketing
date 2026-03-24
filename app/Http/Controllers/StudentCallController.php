@@ -57,7 +57,17 @@ class StudentCallController extends Controller
             $newLeadStatus = $request->boolean('call_connected') ? $data['lead_status'] : ($data['call_status'] === 'wrong_number' ? 'not_interested' : ($student->lead_status ?? 'lead'));
 
             $skipFollowup = in_array($newLeadStatus, self::TERMINAL_LEAD_STATUSES, true);
-            if (! $skipFollowup && empty($data['next_followup_at']) && in_array($newLeadStatus, self::FOLLOWUP_LEAD_STATUSES, true)) {
+            $isNotConnected = in_array($callStatus, StudentCall::notConnectedStatuses(), true);
+            $willHitPermanentCap = false;
+            if ($isNotConnected) {
+                $failedAttemptsSoFar = StudentCall::where('student_id', $student->id)
+                    ->whereIn('call_status', StudentCall::notConnectedStatuses())
+                    ->count();
+                // Include this new call attempt in the cap projection.
+                $willHitPermanentCap = ($failedAttemptsSoFar + 1) >= self::MAX_NOT_CONNECTED_ATTEMPTS;
+            }
+
+            if (! $skipFollowup && ! $willHitPermanentCap && empty($data['next_followup_at']) && in_array($newLeadStatus, self::FOLLOWUP_LEAD_STATUSES, true)) {
                 $request->validate(['next_followup_at' => 'required|date|after:now'], [], ['next_followup_at' => __('Follow-up date')]);
             }
         } else {
@@ -217,11 +227,13 @@ class StudentCallController extends Controller
 
         // Not-connected: only schedule while attempts are under the permanent cap.
         if (in_array($callStatus, StudentCall::notConnectedStatuses(), true)) {
-            $failedAttempts = StudentCall::where('student_id', $student->id)
+            $failedAttemptsSoFar = StudentCall::where('student_id', $student->id)
                 ->whereIn('call_status', StudentCall::notConnectedStatuses())
                 ->count();
 
-            if ($failedAttempts >= self::MAX_NOT_CONNECTED_ATTEMPTS) {
+            // Include this call in projection so the 3rd not-connected call itself gets no follow-up.
+            $projectedAttempts = $failedAttemptsSoFar + 1;
+            if ($projectedAttempts >= self::MAX_NOT_CONNECTED_ATTEMPTS) {
                 // Too many failures already: do not auto-schedule more follow-ups.
                 return null;
             }
