@@ -36,6 +36,17 @@
                         <option value="failed" {{ request('status') === 'failed' ? 'selected' : '' }}>{{ __('Failed') }}</option>
                     </select>
                 </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-500">{{ __('Template') }}</label>
+                    <select name="template_id" class="mt-1 rounded-md border-gray-300 text-sm">
+                        <option value="">{{ __('All') }}</option>
+                        @foreach ($templates as $t)
+                            <option value="{{ $t->id }}" {{ (int) request('template_id', 0) === (int) $t->id ? 'selected' : '' }}>
+                                {{ $t->name }}
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
                 <button type="submit" class="px-3 py-1.5 bg-gray-200 rounded-md text-sm">{{ __('Filter') }}</button>
             </form>
 

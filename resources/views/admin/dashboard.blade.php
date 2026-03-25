@@ -78,7 +78,7 @@
                                                         {{ __('Students') }}: <span class="font-semibold text-slate-700">{{ $school->total_students }}</span>
                                                         · {{ __('Classes') }}: <span class="font-semibold text-slate-700">{{ $school->class_sections_count }}</span>
                                                     </p>
-                                                </div>
+            </div>
 
                                                 <div class="flex items-center gap-2 shrink-0">
                                                     <span class="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-800">
@@ -215,8 +215,8 @@
                                 {{ __('Telecaller performance') }}
                             </a>
                             <a href="{{ route('calls.report') }}" class="inline-flex items-center px-3 py-2 rounded-xl text-xs font-semibold bg-slate-100 hover:bg-slate-200 transition border border-slate-200">{{ __('Call report') }}</a>
-                        </div>
-                    </div>
+                </div>
+            </div>
                 </div>
             </div>
         </div>

@@ -54,9 +54,47 @@
                                 <p class="mt-1 text-xs text-slate-500">{{ __('Click a school to view class breakdown.') }}</p>
                             </div>
                         </div>
+                        @php
+                            $selectedSchoolId = (int) request('school_id', 0);
+                            $perPage = (int) request('per_page', 10);
+                            $perPage = $perPage > 0 ? $perPage : 10;
+                        @endphp
+                        <div class="px-6 pb-4">
+                            <form method="GET" action="{{ route('dashboard') }}" class="flex flex-col sm:flex-row sm:items-end gap-3">
+                                <div class="flex-1">
+                                    <label class="text-[11px] font-semibold text-slate-600">{{ __('Select school') }}</label>
+                                    <select name="school_id"
+                                            class="mt-1 w-full rounded-lg border-slate-200 bg-white text-sm px-3 py-2 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50">
+                                        <option value="0" {{ $selectedSchoolId === 0 ? 'selected' : '' }}>{{ __('All schools') }}</option>
+                                        @foreach (($schoolOptions ?? collect()) as $opt)
+                                            <option value="{{ $opt->school_id }}" {{ $selectedSchoolId === (int) $opt->school_id ? 'selected' : '' }}>
+                                                {{ $opt->school_name }}
+                                            </option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="text-[11px] font-semibold text-slate-600 block">{{ __('Per page') }}</label>
+                                    <select name="per_page"
+                                            class="mt-1 rounded-lg border-slate-200 bg-white text-sm px-3 py-2 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50">
+                                        @foreach ([5, 10, 20] as $opt)
+                                            <option value="{{ $opt }}" {{ $perPage === $opt ? 'selected' : '' }}>{{ $opt }}</option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                                <input type="hidden" name="page" value="1" />
+                                <button type="submit"
+                                        class="inline-flex items-center justify-center px-4 py-2 rounded-lg text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 border border-slate-200 transition">
+                                    {{ __('Apply') }}
+                                </button>
+                            </form>
+                        </div>
                         <div class="px-6 pb-6 space-y-3">
                             @php $schoolBreakdown = $schoolBreakdown ?? collect(); @endphp
-                            @if ($schoolBreakdown->isEmpty())
+                            @php
+                                $schoolBreakdownTotal = $schoolBreakdown->total ?? $schoolBreakdown->count();
+                            @endphp
+                            @if ((int) $schoolBreakdownTotal === 0)
                                 <p class="text-xs text-slate-500 py-3">{{ __('No data for this session yet.') }}</p>
                             @else
                                 @foreach ($schoolBreakdown as $school)
@@ -110,6 +148,45 @@
                                         </div>
                                     </details>
                                 @endforeach
+                                @if ($schoolBreakdown instanceof \Illuminate\Pagination\AbstractPaginator)
+                                    @php
+                                    $currentPage = $schoolBreakdown->currentPage();
+                                    $lastPage = $schoolBreakdown->lastPage();
+                                    $baseQuery = request()->except('page');
+                                    $prevUrl = $currentPage > 1
+                                        ? request()->url() . '?' . http_build_query(array_merge($baseQuery, ['page' => $currentPage - 1]))
+                                        : null;
+                                    $nextUrl = $currentPage < $lastPage
+                                        ? request()->url() . '?' . http_build_query(array_merge($baseQuery, ['page' => $currentPage + 1]))
+                                        : null;
+                                    @endphp
+                                    <div class="pt-3 flex items-center justify-between gap-3">
+                                        <div>
+                                            @if ($prevUrl)
+                                                <a href="{{ $prevUrl }}"
+                                                   class="inline-flex items-center justify-center px-4 py-2 rounded-lg text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 border border-slate-200 transition">
+                                                    {{ __('Prev') }}
+                                                </a>
+                                            @else
+                                                <span class="inline-flex items-center justify-center px-4 py-2 rounded-lg text-xs font-semibold text-slate-400 bg-slate-50 border border-slate-200 transition opacity-50 cursor-not-allowed">
+                                                    {{ __('Prev') }}
+                                                </span>
+                                            @endif
+                                        </div>
+                                        <div>
+                                            @if ($nextUrl)
+                                                <a href="{{ $nextUrl }}"
+                                                   class="inline-flex items-center justify-center px-4 py-2 rounded-lg text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 border border-slate-200 transition">
+                                                    {{ __('Next') }}
+                                                </a>
+                                            @else
+                                                <span class="inline-flex items-center justify-center px-4 py-2 rounded-lg text-xs font-semibold text-slate-400 bg-slate-50 border border-slate-200 transition opacity-50 cursor-not-allowed">
+                                                    {{ __('Next') }}
+                                                </span>
+                                            @endif
+                                        </div>
+                                    </div>
+                                @endif
                             @endif
                         </div>
                     </div>

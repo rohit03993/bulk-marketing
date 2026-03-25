@@ -36,6 +36,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
             $reportSessionId = (int) ($reportSession?->id ?? 0);
             $currentSessionName = (string) ($reportSession?->name ?? '2025-26');
 
+            // UI filters for admin snapshot
+            $selectedSchoolId = (int) request('school_id', 0);
+            $perPage = (int) request('per_page', 10);
+            $perPage = $perPage > 0 ? max(5, min($perPage, 50)) : 10;
+            $page = (int) request('page', 1);
+            $page = max(1, $page);
+
             $endOfToday = now()->endOfDay();
             $dueLeadStatuses = ['interested', 'follow_up_later'];
             $convertedStatuses = ['walkin_done', 'admission_done'];
@@ -49,15 +56,38 @@ Route::middleware(['auth', 'verified'])->group(function () {
                 : "sum(case when st.lead_status in ('" . implode("','", $dueLeadStatuses) . "') and st.next_followup_at is not null and st.next_followup_at <= ? then 1 else 0 end) as followups_due_count";
             $convertedSelect = "sum(case when st.lead_status in ('" . implode("','", $convertedStatuses) . "') then 1 else 0 end) as converted_count";
 
-            $schoolAggs = \Illuminate\Support\Facades\DB::table('schools as sch')
-                ->leftJoin('class_sections as cs', function ($join) use ($reportSessionId) {
+            // Only include schools that have students assigned to (non-admin) telecallers.
+            $schoolAggQuery = \Illuminate\Support\Facades\DB::table('schools as sch')
+                ->join('class_sections as cs', function ($join) use ($reportSessionId) {
                     $join->on('cs.school_id', '=', 'sch.id')
                         ->where('cs.academic_session_id', '=', $reportSessionId);
                 })
-                ->leftJoin('students as st', function ($join) {
+                ->join('students as st', function ($join) {
                     $join->on('st.class_section_id', '=', 'cs.id')
-                        ->whereNull('st.deleted_at');
+                        ->whereNull('st.deleted_at')
+                        ->whereNotNull('st.assigned_to');
                 })
+                ->join('users as u', function ($join) {
+                    $join->on('u.id', '=', 'st.assigned_to')
+                        ->where('u.is_admin', '=', 0);
+                });
+
+            if ($selectedSchoolId > 0) {
+                $schoolAggQuery->where('sch.id', '=', $selectedSchoolId);
+            }
+
+            // Dropdown options: only schools that have telecaller-assigned student data.
+            $schoolOptions = (clone $schoolAggQuery)
+                ->select([
+                    'sch.id as school_id',
+                    'sch.name as school_name',
+                ])
+                ->distinct()
+                ->orderBy('sch.name')
+                ->get()
+                ->values();
+
+            $schoolAggs = (clone $schoolAggQuery)
                 ->groupBy('sch.id', 'sch.name')
                 ->select([
                     'sch.id as school_id',
@@ -79,11 +109,17 @@ Route::middleware(['auth', 'verified'])->group(function () {
                     return $row;
                 });
 
+            // Class snapshot: only classes that belong to schools that have telecaller-assigned students.
             $classAggs = \Illuminate\Support\Facades\DB::table('class_sections as cs')
                 ->join('schools as sch', 'sch.id', '=', 'cs.school_id')
-                ->leftJoin('students as st', function ($join) {
+                ->join('students as st', function ($join) {
                     $join->on('st.class_section_id', '=', 'cs.id')
-                        ->whereNull('st.deleted_at');
+                        ->whereNull('st.deleted_at')
+                        ->whereNotNull('st.assigned_to');
+                })
+                ->join('users as u', function ($join) {
+                    $join->on('u.id', '=', 'st.assigned_to')
+                        ->where('u.is_admin', '=', 0);
                 })
                 ->where('cs.academic_session_id', '=', $reportSessionId)
                 ->groupBy('cs.id', 'cs.school_id', 'cs.class_name', 'cs.section_name', 'sch.name')
@@ -114,6 +150,20 @@ Route::middleware(['auth', 'verified'])->group(function () {
                 $s->classes = $classesBySchoolId[$s->school_id] ?? collect();
                 return $s;
             })->values();
+
+            // Pagination for the school list (to keep UI readable).
+            $schoolBreakdownTotal = $schoolBreakdown->count();
+            $schoolBreakdownPageItems = $schoolBreakdown->forPage($page, $perPage)->values();
+            $schoolBreakdown = new \Illuminate\Pagination\LengthAwarePaginator(
+                $schoolBreakdownPageItems,
+                $schoolBreakdownTotal,
+                $perPage,
+                $page,
+                [
+                    'path' => request()->url(),
+                    'query' => request()->query(),
+                ]
+            );
 
             $telecallerAggs = \Illuminate\Support\Facades\DB::table('users as u')
                 ->join('students as st', 'st.assigned_to', '=', 'u.id')
@@ -228,6 +278,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
                 'currentSessionName',
                 'kpi',
                 'schoolBreakdown',
+                'schoolOptions',
+                'selectedSchoolId',
                 'telecallerAggs'
             ));
         }

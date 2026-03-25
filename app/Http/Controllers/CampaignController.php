@@ -26,9 +26,13 @@ class CampaignController extends Controller
         if ($request->filled('status')) {
             $query->where('status', $request->status);
         }
+        if ($request->filled('template_id')) {
+            $query->where('aisensy_template_id', $request->template_id);
+        }
 
         $campaigns = $query->paginate(15)->withQueryString();
         $schools = School::orderBy('name')->get();
+        $templates = AisensyTemplate::orderBy('name')->get();
 
         $ids = $campaigns->pluck('id')->all();
         $realCounts = [];
@@ -43,7 +47,7 @@ class CampaignController extends Controller
             }
         }
 
-        return view('crm.campaigns.index', compact('campaigns', 'schools', 'realCounts'));
+        return view('crm.campaigns.index', compact('campaigns', 'schools', 'templates', 'realCounts'));
     }
 
     protected function templatePreviewLabel(string $source): string
