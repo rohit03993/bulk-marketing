@@ -189,7 +189,6 @@
                                         <th class="px-3 py-2 text-left font-semibold text-slate-500">{{ __('Telecaller') }}</th>
                                         <th class="px-3 py-2 text-left font-semibold text-slate-500">{{ __('Score') }}</th>
                                         <th class="px-3 py-2 text-left font-semibold text-slate-500">{{ __('Calls') }}</th>
-                                        <th class="px-3 py-2 text-left font-semibold text-slate-500">{{ __('Connected %') }}</th>
                                         <th class="px-3 py-2 text-left font-semibold text-slate-500">{{ __('Follow-up %') }}</th>
                                     </tr>
                                 </thead>
@@ -213,9 +212,6 @@
                                             </td>
                                             <td class="px-3 py-2 text-slate-600">
                                                 {{ $b['total_calls'] ?? 0 }}
-                                            </td>
-                                            <td class="px-3 py-2 text-slate-600">
-                                                {{ $b['connected_rate'] ?? 0 }}%
                                             </td>
                                             <td class="px-3 py-2 text-slate-600">
                                                 {{ $b['followup_compliance'] ?? 0 }}%
@@ -343,7 +339,6 @@
                             <p class="mt-3 text-4xl font-extrabold {{ $colorFor($scoreToday['score'] ?? 0) }}">{{ $scoreToday['score'] ?? 0 }}%</p>
                             <div class="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
                                 <span>{{ __('Calls') }}: <strong class="text-slate-700">{{ $scoreToday['breakdown']['total_calls'] ?? 0 }}/{{ $scoreToday['breakdown']['daily_target'] ?? 25 }}</strong></span>
-                                <span>{{ __('Connected') }}: <strong class="text-slate-700">{{ $scoreToday['breakdown']['connected_rate'] ?? 0 }}%</strong></span>
                                 <span>{{ __('Follow-up') }}: <strong class="text-slate-700">{{ $scoreToday['breakdown']['followup_compliance'] ?? 0 }}%</strong></span>
                             </div>
                         </div>

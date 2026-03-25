@@ -18,7 +18,7 @@ class DemoSeeder extends Seeder
     public function run(): void
     {
         $admin = User::updateOrCreate(
-            ['email' => 'admin@example.com'],
+            ['email' => '-'],
             [
                 'name' => 'Admin User',
                 'password' => Hash::make('password'),

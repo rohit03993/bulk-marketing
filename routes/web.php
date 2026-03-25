@@ -200,18 +200,15 @@ Route::middleware(['auth', 'verified'])->group(function () {
                 $dailyTarget = 25;
 
                 foreach ($telecallers as $staff) {
-                    $firstCalledAt = \App\Models\StudentCall::where('user_id', $staff->id)->min('called_at');
-                    if (! $firstCalledAt) {
+                    $overall = $scoreService->computeOverallAverage($staff->id, $dailyTarget);
+                    if (($overall['days'] ?? 0) <= 0) {
                         continue;
                     }
 
-                    $leaderboardStart = \Illuminate\Support\Carbon::parse($firstCalledAt)->startOfDay();
-                    $score = $scoreService->compute($staff->id, $leaderboardStart, $leaderboardTo, $dailyTarget);
-
                     $leaderboard[] = [
                         'user' => $staff,
-                        'score' => $score['score'],
-                        'breakdown' => $score['breakdown'],
+                        'score' => $overall['score'],
+                        'breakdown' => $overall['breakdown'] ?? [],
                     ];
                 }
 
