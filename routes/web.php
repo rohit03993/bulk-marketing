@@ -30,6 +30,124 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
         // Admin: global view
         if ($user->isAdmin()) {
+            // Reporting scope: fixed academic session 2025-26 only.
+            $reportSession = \App\Models\AcademicSession::where('name', '2025-26')->first()
+                ?? \App\Models\AcademicSession::orderByDesc('starts_at')->first();
+            $reportSessionId = (int) ($reportSession?->id ?? 0);
+            $currentSessionName = (string) ($reportSession?->name ?? '2025-26');
+
+            $endOfToday = now()->endOfDay();
+            $dueLeadStatuses = ['interested', 'follow_up_later'];
+            $convertedStatuses = ['walkin_done', 'admission_done'];
+
+            $hasBlockField = \Illuminate\Support\Facades\Schema::hasColumn('students', 'is_call_blocked');
+            $blockedSelect = $hasBlockField
+                ? "sum(case when coalesce(st.is_call_blocked,0) = 1 then 1 else 0 end) as blocked_count"
+                : "0 as blocked_count";
+            $dueSelect = $hasBlockField
+                ? "sum(case when st.lead_status in ('" . implode("','", $dueLeadStatuses) . "') and st.next_followup_at is not null and st.next_followup_at <= ? and coalesce(st.is_call_blocked,0) = 0 then 1 else 0 end) as followups_due_count"
+                : "sum(case when st.lead_status in ('" . implode("','", $dueLeadStatuses) . "') and st.next_followup_at is not null and st.next_followup_at <= ? then 1 else 0 end) as followups_due_count";
+            $convertedSelect = "sum(case when st.lead_status in ('" . implode("','", $convertedStatuses) . "') then 1 else 0 end) as converted_count";
+
+            $schoolAggs = \Illuminate\Support\Facades\DB::table('schools as sch')
+                ->leftJoin('class_sections as cs', function ($join) use ($reportSessionId) {
+                    $join->on('cs.school_id', '=', 'sch.id')
+                        ->where('cs.academic_session_id', '=', $reportSessionId);
+                })
+                ->leftJoin('students as st', function ($join) {
+                    $join->on('st.class_section_id', '=', 'cs.id')
+                        ->whereNull('st.deleted_at');
+                })
+                ->groupBy('sch.id', 'sch.name')
+                ->select([
+                    'sch.id as school_id',
+                    'sch.name as school_name',
+                    \Illuminate\Support\Facades\DB::raw('count(st.id) as total_students'),
+                    \Illuminate\Support\Facades\DB::raw('count(distinct cs.id) as class_sections_count'),
+                    \Illuminate\Support\Facades\DB::raw($convertedSelect),
+                    \Illuminate\Support\Facades\DB::raw($blockedSelect),
+                ])
+                ->selectRaw($dueSelect, [$endOfToday])
+                ->orderBy('sch.name')
+                ->get()
+                ->map(function ($row) {
+                    $row->total_students = (int) $row->total_students;
+                    $row->class_sections_count = (int) $row->class_sections_count;
+                    $row->converted_count = (int) $row->converted_count;
+                    $row->followups_due_count = (int) $row->followups_due_count;
+                    $row->blocked_count = (int) $row->blocked_count;
+                    return $row;
+                });
+
+            $classAggs = \Illuminate\Support\Facades\DB::table('class_sections as cs')
+                ->join('schools as sch', 'sch.id', '=', 'cs.school_id')
+                ->leftJoin('students as st', function ($join) {
+                    $join->on('st.class_section_id', '=', 'cs.id')
+                        ->whereNull('st.deleted_at');
+                })
+                ->where('cs.academic_session_id', '=', $reportSessionId)
+                ->groupBy('cs.id', 'cs.school_id', 'cs.class_name', 'cs.section_name', 'sch.name')
+                ->select([
+                    'cs.id as class_section_id',
+                    'cs.school_id',
+                    'sch.name as school_name',
+                    'cs.class_name',
+                    'cs.section_name',
+                    \Illuminate\Support\Facades\DB::raw('count(st.id) as total_students'),
+                    \Illuminate\Support\Facades\DB::raw($convertedSelect),
+                    \Illuminate\Support\Facades\DB::raw($blockedSelect),
+                ])
+                ->selectRaw($dueSelect, [$endOfToday])
+                ->orderBy('cs.class_name')
+                ->orderBy('cs.section_name')
+                ->get()
+                ->map(function ($row) {
+                    $row->total_students = (int) $row->total_students;
+                    $row->converted_count = (int) $row->converted_count;
+                    $row->followups_due_count = (int) $row->followups_due_count;
+                    $row->blocked_count = (int) $row->blocked_count;
+                    return $row;
+                });
+
+            $classesBySchoolId = $classAggs->groupBy('school_id');
+            $schoolBreakdown = $schoolAggs->map(function ($s) use ($classesBySchoolId) {
+                $s->classes = $classesBySchoolId[$s->school_id] ?? collect();
+                return $s;
+            })->values();
+
+            $telecallerAggs = \Illuminate\Support\Facades\DB::table('users as u')
+                ->join('students as st', 'st.assigned_to', '=', 'u.id')
+                ->join('class_sections as cs', 'cs.id', '=', 'st.class_section_id')
+                ->where('u.is_admin', '=', 0)
+                ->where('cs.academic_session_id', '=', $reportSessionId)
+                ->whereNull('st.deleted_at')
+                ->groupBy('u.id', 'u.name')
+                ->select([
+                    'u.id as telecaller_id',
+                    'u.name as telecaller_name',
+                    \Illuminate\Support\Facades\DB::raw('count(st.id) as assigned_students_count'),
+                    \Illuminate\Support\Facades\DB::raw($convertedSelect),
+                    \Illuminate\Support\Facades\DB::raw($blockedSelect),
+                ])
+                ->selectRaw($dueSelect, [$endOfToday])
+                ->havingRaw('count(st.id) > 0')
+                ->orderByDesc('followups_due_count')
+                ->get()
+                ->map(function ($row) {
+                    $row->assigned_students_count = (int) $row->assigned_students_count;
+                    $row->converted_count = (int) $row->converted_count;
+                    $row->followups_due_count = (int) $row->followups_due_count;
+                    $row->blocked_count = (int) $row->blocked_count;
+                    return $row;
+                });
+
+            $kpi = [
+                'total_students' => (int) $schoolAggs->sum('total_students'),
+                'converted' => (int) $schoolAggs->sum('converted_count'),
+                'followups_due' => (int) $schoolAggs->sum('followups_due_count'),
+                'blocked' => (int) $schoolAggs->sum('blocked_count'),
+            ];
+
             $stats = [
                 'schools' => \App\Models\School::count(),
                 'students' => \App\Models\Student::count(),
@@ -66,11 +184,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
             });
             $mode = 'admin';
 
-            // Telecaller leaderboard (last 7 days, based on same scoring as telecaller view)
-            $leaderboardDays = 7;
-            $leaderboardTo = now();
-            $leaderboardFrom = $leaderboardTo->copy()->subDays($leaderboardDays - 1)->startOfDay();
-            $leaderboardToEnd = $leaderboardTo->copy()->endOfDay();
+            // Telecaller leaderboard (full history: from each telecaller’s first call till now).
+            $leaderboardFrom = null;
+            $leaderboardToEnd = null;
+            $leaderboardTo = now()->copy()->endOfDay();
 
             // Consider all non-admin staff as potential telecallers for leaderboard
             $telecallers = \App\Models\User::where('is_admin', false)
@@ -83,7 +200,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
                 $dailyTarget = 25;
 
                 foreach ($telecallers as $staff) {
-                    $score = $scoreService->compute($staff->id, $leaderboardFrom, $leaderboardToEnd, $dailyTarget);
+                    $firstCalledAt = \App\Models\StudentCall::where('user_id', $staff->id)->min('called_at');
+                    if (! $firstCalledAt) {
+                        continue;
+                    }
+
+                    $leaderboardStart = \Illuminate\Support\Carbon::parse($firstCalledAt)->startOfDay();
+                    $score = $scoreService->compute($staff->id, $leaderboardStart, $leaderboardTo, $dailyTarget);
 
                     $leaderboard[] = [
                         'user' => $staff,
@@ -97,7 +220,19 @@ Route::middleware(['auth', 'verified'])->group(function () {
                 });
             }
 
-            return view('dashboard', compact('stats', 'schools', 'recentCampaigns', 'mode', 'leaderboard', 'leaderboardFrom', 'leaderboardToEnd'));
+            return view('dashboard', compact(
+                'stats',
+                'schools',
+                'recentCampaigns',
+                'mode',
+                'leaderboard',
+                'leaderboardFrom',
+                'leaderboardToEnd',
+                'currentSessionName',
+                'kpi',
+                'schoolBreakdown',
+                'telecallerAggs'
+            ));
         }
 
         // Telecaller / staff: personal dashboard
@@ -270,20 +405,144 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('ops/danger-zone/data-reset', [DataResetController::class, 'showResetForm'])->name('reset-data');
         Route::post('ops/danger-zone/data-reset', [DataResetController::class, 'reset'])->name('reset-data.perform');
         Route::get('/', function () {
-            $schools = \App\Models\School::withCount('classSections')->orderBy('name')->get();
-            $sessions = \App\Models\AcademicSession::orderByDesc('starts_at')->get();
-            $recentCampaigns = \App\Models\Campaign::with('school', 'template')->orderByDesc('created_at')->take(10)->get();
-            $recentImports = \App\Models\StudentImport::with('school')->orderByDesc('created_at')->take(5)->get();
-            $stats = [
-                'schools' => \App\Models\School::count(),
-                'sessions' => \App\Models\AcademicSession::count(),
-                'class_sections' => \App\Models\ClassSection::count(),
-                'students' => \App\Models\Student::count(),
-                'templates' => \App\Models\AisensyTemplate::count(),
-                'campaigns' => \App\Models\Campaign::count(),
-                'messages_sent' => \App\Models\CampaignRecipient::where('status', 'sent')->count(),
+            // Admin "Reports" dashboard (read-only). Fixed to academic session `2025-26` only.
+            $session = \App\Models\AcademicSession::where('name', '2025-26')->first()
+                ?? \App\Models\AcademicSession::orderByDesc('starts_at')->first();
+
+            $sessionId = (int) ($session?->id ?? 0);
+            $sessionName = (string) ($session?->name ?? '2025-26');
+
+            $endOfToday = now()->endOfDay();
+
+            $dueLeadStatuses = ['interested', 'follow_up_later'];
+            $convertedStatuses = ['walkin_done', 'admission_done'];
+
+            $hasBlockField = \Illuminate\Support\Facades\Schema::hasColumn('students', 'is_call_blocked');
+
+            // If `is_call_blocked` isn't present for some reason, fall back to "blocked_count = 0" and don't exclude from due counts.
+            $blockedSelect = $hasBlockField
+                ? "sum(case when coalesce(st.is_call_blocked,0) = 1 then 1 else 0 end) as blocked_count"
+                : "0 as blocked_count";
+
+            $dueSelect = $hasBlockField
+                ? "sum(case when st.lead_status in ('" . implode("','", $dueLeadStatuses) . "') and st.next_followup_at is not null and st.next_followup_at <= ? and coalesce(st.is_call_blocked,0) = 0 then 1 else 0 end) as followups_due_count"
+                : "sum(case when st.lead_status in ('" . implode("','", $dueLeadStatuses) . "') and st.next_followup_at is not null and st.next_followup_at <= ? then 1 else 0 end) as followups_due_count";
+
+            $convertedSelect = "sum(case when st.lead_status in ('" . implode("','", $convertedStatuses) . "') then 1 else 0 end) as converted_count";
+
+            // School -> totals for the current session.
+            $schoolAggs = \Illuminate\Support\Facades\DB::table('schools as sch')
+                ->leftJoin('class_sections as cs', function ($join) use ($sessionId) {
+                    $join->on('cs.school_id', '=', 'sch.id')
+                        ->where('cs.academic_session_id', '=', $sessionId);
+                })
+                ->leftJoin('students as st', function ($join) {
+                    $join->on('st.class_section_id', '=', 'cs.id')
+                        ->whereNull('st.deleted_at');
+                })
+                ->groupBy('sch.id', 'sch.name')
+                ->select([
+                    'sch.id as school_id',
+                    'sch.name as school_name',
+                    \Illuminate\Support\Facades\DB::raw('count(st.id) as total_students'),
+                    \Illuminate\Support\Facades\DB::raw('count(distinct cs.id) as class_sections_count'),
+                    \Illuminate\Support\Facades\DB::raw($convertedSelect),
+                    \Illuminate\Support\Facades\DB::raw($blockedSelect),
+                ])
+                ->selectRaw($dueSelect, [$endOfToday])
+                ->orderBy('sch.name')
+                ->get();
+
+            $schoolAggs = $schoolAggs->map(function ($row) {
+                $row->total_students = (int) $row->total_students;
+                $row->class_sections_count = (int) $row->class_sections_count;
+                $row->converted_count = (int) $row->converted_count;
+                $row->followups_due_count = (int) $row->followups_due_count;
+                $row->blocked_count = (int) $row->blocked_count;
+                return $row;
+            });
+
+            // Class/Section breakdown for the current session.
+            $classAggs = \Illuminate\Support\Facades\DB::table('class_sections as cs')
+                ->join('schools as sch', 'sch.id', '=', 'cs.school_id')
+                ->leftJoin('students as st', function ($join) {
+                    $join->on('st.class_section_id', '=', 'cs.id')
+                        ->whereNull('st.deleted_at');
+                })
+                ->where('cs.academic_session_id', '=', $sessionId)
+                ->groupBy('cs.id', 'cs.school_id', 'cs.class_name', 'cs.section_name', 'sch.name')
+                ->select([
+                    'cs.id as class_section_id',
+                    'cs.school_id',
+                    'sch.name as school_name',
+                    'cs.class_name',
+                    'cs.section_name',
+                    \Illuminate\Support\Facades\DB::raw('count(st.id) as total_students'),
+                    \Illuminate\Support\Facades\DB::raw($convertedSelect),
+                    \Illuminate\Support\Facades\DB::raw($blockedSelect),
+                ])
+                ->selectRaw($dueSelect, [$endOfToday])
+                ->orderBy('cs.class_name')
+                ->orderBy('cs.section_name')
+                ->get()
+                ->map(function ($row) {
+                    $row->total_students = (int) $row->total_students;
+                    $row->converted_count = (int) $row->converted_count;
+                    $row->followups_due_count = (int) $row->followups_due_count;
+                    $row->blocked_count = (int) $row->blocked_count;
+                    return $row;
+                });
+
+            $classesBySchoolId = $classAggs->groupBy('school_id');
+
+            // Telecaller breakdown for follow-ups due (overall) within the current session.
+            $telecallerAggs = \Illuminate\Support\Facades\DB::table('users as u')
+                ->join('students as st', 'st.assigned_to', '=', 'u.id')
+                ->join('class_sections as cs', 'cs.id', '=', 'st.class_section_id')
+                ->where('u.is_admin', '=', 0)
+                ->where('cs.academic_session_id', '=', $sessionId)
+                ->whereNull('st.deleted_at')
+                ->groupBy('u.id', 'u.name')
+                ->select([
+                    'u.id as telecaller_id',
+                    'u.name as telecaller_name',
+                    \Illuminate\Support\Facades\DB::raw('count(st.id) as assigned_students_count'),
+                    \Illuminate\Support\Facades\DB::raw($convertedSelect),
+                    \Illuminate\Support\Facades\DB::raw($blockedSelect),
+                ])
+                ->selectRaw($dueSelect, [$endOfToday])
+                ->havingRaw('count(st.id) > 0')
+                ->orderByDesc('followups_due_count')
+                ->get()
+                ->map(function ($row) {
+                    $row->assigned_students_count = (int) $row->assigned_students_count;
+                    $row->converted_count = (int) $row->converted_count;
+                    $row->followups_due_count = (int) $row->followups_due_count;
+                    $row->blocked_count = (int) $row->blocked_count;
+                    return $row;
+                });
+
+            $firstTelecallerId = $telecallerAggs->first()->telecaller_id ?? 0;
+
+            $kpi = [
+                'total_students' => (int) $schoolAggs->sum('total_students'),
+                'converted' => (int) $schoolAggs->sum('converted_count'),
+                'followups_due' => (int) $schoolAggs->sum('followups_due_count'),
+                'blocked' => (int) $schoolAggs->sum('blocked_count'),
             ];
-            return view('admin.dashboard', compact('schools', 'sessions', 'recentCampaigns', 'recentImports', 'stats'));
+
+            $schoolBreakdown = $schoolAggs->map(function ($s) use ($classesBySchoolId) {
+                $s->classes = $classesBySchoolId[$s->school_id] ?? collect();
+                return $s;
+            })->values();
+
+            return view('admin.dashboard', [
+                'currentSessionName' => $sessionName,
+                'kpi' => $kpi,
+                'schoolBreakdown' => $schoolBreakdown,
+                'telecallerAggs' => $telecallerAggs,
+                'firstTelecallerId' => $firstTelecallerId,
+            ]);
         })->name('dashboard');
     });
 });

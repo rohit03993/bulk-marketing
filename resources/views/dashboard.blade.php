@@ -15,24 +15,138 @@
     <div class="py-8">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
             @if ($mode === 'admin')
-                {{-- Admin summary --}}
+                {{-- Admin reports (fixed session) --}}
+                <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
+                    <div class="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+                        <div>
+                            <p class="text-sm font-semibold text-slate-900">{{ __('Admin Reports') }}</p>
+                            <p class="mt-0.5 text-xs text-slate-500">{{ __('Academic session') }}: <span class="font-semibold text-slate-700">{{ $currentSessionName ?? '2025-26' }}</span></p>
+                        </div>
+                    </div>
+                </div>
+
+                {{-- KPI cards (reporting) --}}
                 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-                    <a href="{{ route('students.index') }}" class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 hover:border-indigo-300 hover:shadow-md transition">
-                        <p class="text-sm font-medium text-slate-500">{{ __('Students') }}</p>
-                        <p class="mt-2 text-3xl font-bold text-slate-800">{{ $stats['students'] ?? 0 }}</p>
-                    </a>
-                    <a href="{{ route('campaigns.index') }}" class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 hover:border-indigo-300 hover:shadow-md transition">
-                        <p class="text-sm font-medium text-slate-500">{{ __('Campaigns') }}</p>
-                        <p class="mt-2 text-3xl font-bold text-slate-800">{{ $stats['campaigns'] ?? 0 }}</p>
-                    </a>
-                    <a href="{{ route('campaigns.index') }}" class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 hover:border-emerald-300 hover:shadow-md transition">
-                        <p class="text-sm font-medium text-slate-500">{{ __('Messages sent') }}</p>
-                        <p class="mt-2 text-3xl font-bold text-emerald-700">{{ $stats['sent'] ?? 0 }}</p>
-                    </a>
-                    <a href="{{ route('campaigns.index') }}" class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 hover:border-amber-300 hover:shadow-md transition">
-                        <p class="text-sm font-medium text-slate-500">{{ __('Pending campaigns') }}</p>
-                        <p class="mt-2 text-3xl font-bold text-amber-700">{{ $stats['pending'] ?? 0 }}</p>
-                    </a>
+                    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+                        <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide">{{ __('Total students') }}</p>
+                        <p class="mt-2 text-3xl font-extrabold text-slate-900">{{ $kpi['total_students'] ?? 0 }}</p>
+                    </div>
+                    <div class="bg-white rounded-2xl border border-emerald-200 shadow-sm p-6">
+                        <p class="text-xs font-semibold text-emerald-700 uppercase tracking-wide">{{ __('Converted') }}</p>
+                        <p class="mt-2 text-3xl font-extrabold text-emerald-700">{{ $kpi['converted'] ?? 0 }}</p>
+                    </div>
+                    <div class="bg-white rounded-2xl border border-amber-200 shadow-sm p-6">
+                        <p class="text-xs font-semibold text-amber-700 uppercase tracking-wide">{{ __('Follow-ups due') }}</p>
+                        <p class="mt-2 text-3xl font-extrabold text-amber-700">{{ $kpi['followups_due'] ?? 0 }}</p>
+                    </div>
+                    <div class="bg-white rounded-2xl border border-rose-200 shadow-sm p-6">
+                        <p class="text-xs font-semibold text-rose-700 uppercase tracking-wide">{{ __('Blocked leads') }}</p>
+                        <p class="mt-2 text-3xl font-extrabold text-rose-700">{{ $kpi['blocked'] ?? 0 }}</p>
+                    </div>
+                </div>
+
+                {{-- School -> class snapshot + telecaller due breakdown --}}
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <div class="lg:col-span-2 bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                        <div class="px-6 pt-6 pb-3 flex items-center justify-between">
+                            <div>
+                                <p class="text-sm font-semibold text-slate-900">{{ __('School -> Class snapshot') }}</p>
+                                <p class="mt-1 text-xs text-slate-500">{{ __('Click a school to view class breakdown.') }}</p>
+                            </div>
+                        </div>
+                        <div class="px-6 pb-6 space-y-3">
+                            @php $schoolBreakdown = $schoolBreakdown ?? collect(); @endphp
+                            @if ($schoolBreakdown->isEmpty())
+                                <p class="text-xs text-slate-500 py-3">{{ __('No data for this session yet.') }}</p>
+                            @else
+                                @foreach ($schoolBreakdown as $school)
+                                    <details class="group rounded-xl border border-slate-200 bg-white overflow-hidden">
+                                        <summary class="cursor-pointer list-none px-4 py-3 flex items-center justify-between gap-3">
+                                            <div class="min-w-0">
+                                                <p class="text-sm font-semibold text-slate-900 truncate">{{ $school->school_name }}</p>
+                                                <p class="text-xs text-slate-500 mt-0.5">
+                                                    {{ __('Students') }}: <span class="font-semibold text-slate-700">{{ $school->total_students }}</span>
+                                                    · {{ __('Classes') }}: <span class="font-semibold text-slate-700">{{ $school->class_sections_count }}</span>
+                                                </p>
+                                            </div>
+                                            <div class="flex items-center gap-2 shrink-0">
+                                                <span class="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-800">
+                                                    {{ __('Converted') }}: {{ $school->converted_count }}
+                                                </span>
+                                                <span class="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-800">
+                                                    {{ __('Due') }}: {{ $school->followups_due_count }}
+                                                </span>
+                                            </div>
+                                        </summary>
+                                        <div class="px-4 pb-4">
+                                            @php $classes = $school->classes ?? collect(); @endphp
+                                            @if ($classes->isEmpty())
+                                                <p class="text-xs text-slate-500 py-2">{{ __('No class data.') }}</p>
+                                            @else
+                                                <div class="overflow-x-auto rounded-lg border border-slate-200">
+                                                    <table class="min-w-full divide-y divide-slate-200 text-sm">
+                                                        <thead class="bg-slate-50">
+                                                            <tr>
+                                                                <th class="px-3 py-2 text-left text-xs font-semibold text-slate-600">{{ __('Class') }}</th>
+                                                                <th class="px-3 py-2 text-right text-xs font-semibold text-slate-600">{{ __('Students') }}</th>
+                                                                <th class="px-3 py-2 text-right text-xs font-semibold text-emerald-700">{{ __('Converted') }}</th>
+                                                                <th class="px-3 py-2 text-right text-xs font-semibold text-amber-700">{{ __('Due') }}</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody class="divide-y divide-slate-100 bg-white">
+                                                            @foreach ($classes as $cls)
+                                                                @php $label = $cls->section_name ? ($cls->class_name . ' - ' . $cls->section_name) : $cls->class_name; @endphp
+                                                                <tr class="hover:bg-slate-50/60">
+                                                                    <td class="px-3 py-2 text-slate-800 font-medium">{{ $label }}</td>
+                                                                    <td class="px-3 py-2 text-right text-slate-700">{{ $cls->total_students }}</td>
+                                                                    <td class="px-3 py-2 text-right text-emerald-700 font-semibold">{{ $cls->converted_count }}</td>
+                                                                    <td class="px-3 py-2 text-right text-amber-700 font-semibold">{{ $cls->followups_due_count }}</td>
+                                                                </tr>
+                                                            @endforeach
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            @endif
+                                        </div>
+                                    </details>
+                                @endforeach
+                            @endif
+                        </div>
+                    </div>
+
+                    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                        <div class="px-6 pt-6 pb-3">
+                            <p class="text-sm font-semibold text-slate-900">{{ __('Follow-ups due by telecaller') }}</p>
+                            <p class="mt-1 text-xs text-slate-500">{{ __('Overall (current session)') }}</p>
+                        </div>
+                        <div class="px-6 pb-6">
+                            @php $telecallerAggs = $telecallerAggs ?? collect(); @endphp
+                            @if ($telecallerAggs->isEmpty())
+                                <p class="text-xs text-slate-500 py-3">{{ __('No telecaller data yet.') }}</p>
+                            @else
+                                <div class="overflow-x-auto rounded-lg border border-slate-200">
+                                    <table class="min-w-full divide-y divide-slate-200 text-sm">
+                                        <thead class="bg-slate-50">
+                                            <tr>
+                                                <th class="px-3 py-2 text-left text-xs font-semibold text-slate-600">{{ __('Telecaller') }}</th>
+                                                <th class="px-3 py-2 text-right text-xs font-semibold text-amber-700">{{ __('Due') }}</th>
+                                                <th class="px-3 py-2 text-right text-xs font-semibold text-emerald-700">{{ __('Converted') }}</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody class="divide-y divide-slate-100 bg-white">
+                                            @foreach ($telecallerAggs as $t)
+                                                <tr class="hover:bg-slate-50/60">
+                                                    <td class="px-3 py-2 text-slate-800 font-medium">{{ $t->telecaller_name }}</td>
+                                                    <td class="px-3 py-2 text-right text-amber-700 font-semibold">{{ $t->followups_due_count }}</td>
+                                                    <td class="px-3 py-2 text-right text-emerald-700 font-semibold">{{ $t->converted_count }}</td>
+                                                </tr>
+                                            @endforeach
+                                        </tbody>
+                                    </table>
+                                </div>
+                            @endif
+                        </div>
+                    </div>
                 </div>
 
                 @php
@@ -42,18 +156,25 @@
                 @endphp
 
                 <div class="mt-8 bg-white rounded-2xl border border-slate-200 shadow-sm">
-                    <div class="px-6 pt-6 pb-3 flex items-center justify-between">
+                    <div class="px-6 pt-6 pb-3 flex items-center justify-between gap-4">
                         <div>
                             <p class="text-sm font-medium text-slate-500">{{ __('Telecaller leaderboard') }}</p>
-                            @if ($leaderboardFrom && $leaderboardToEnd)
-                                <p class="mt-1 text-xs text-slate-500">
-                                    {{ __('Last 7 days (same scoring as telecaller dashboard)') }}
-                                </p>
-                            @endif
+                            <p class="mt-1 text-xs text-slate-500">
+                                {{ __('Full history (since first call) — score based on all calls)') }}
+                            </p>
+                            <p class="mt-1 text-[11px] text-slate-400">
+                                {{ __('Last updated') }}: <span id="leaderboardLastUpdated">{{ now()->format('d M, h:i:s A') }}</span>
+                            </p>
                         </div>
-                        <a href="{{ route('calls.report') }}" class="text-xs font-semibold text-indigo-600 hover:text-indigo-800">
-                            {{ __('Open call report') }}
-                        </a>
+                        <div class="flex items-center gap-2">
+                            <button type="button" id="refreshLeaderboardBtn"
+                                    class="inline-flex items-center px-3 py-2 rounded-lg text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 border border-slate-200 transition">
+                                {{ __('Refresh') }}
+                            </button>
+                            <a href="{{ route('calls.report') }}" class="text-xs font-semibold text-indigo-600 hover:text-indigo-800">
+                                {{ __('Open call report') }}
+                            </a>
+                        </div>
                     </div>
                     <div class="px-6 pb-6 overflow-x-auto">
                         @if (empty($leaderboard))
@@ -106,6 +227,25 @@
                         @endif
                     </div>
                 </div>
+
+                <script>
+                    (function () {
+                        const btn = document.getElementById('refreshLeaderboardBtn');
+                        if (btn) {
+                            btn.addEventListener('click', function () {
+                                window.location.reload();
+                            });
+                        }
+
+                        // Auto-refresh (admin only) so scores stay current without manual refresh.
+                        // Keeps it lightweight by reloading the page at a safe interval.
+                        const AUTO_REFRESH_MS = 60 * 1000; // 1 minute
+                        window.setInterval(function () {
+                            // If user is interacting (modal/open) we still reload; keeping simple as requested.
+                            window.location.reload();
+                        }, AUTO_REFRESH_MS);
+                    })();
+                </script>
             @else
                 {{-- Telecaller personal dashboard (app-style) --}}
 
