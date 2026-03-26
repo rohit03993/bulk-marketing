@@ -116,19 +116,21 @@ class StudentController extends Controller
     {
         $student->load('classSection.school', 'classSection.academicSession');
         $classSections = ClassSection::with('school', 'academicSession')->orderBy('class_name')->orderBy('section_name')->get();
+        $schools = School::orderBy('name')->get();
 
         $assignableUsers = [];
         if (Auth::user()?->isAdmin()) {
             $assignableUsers = \App\Models\User::orderBy('name')->get();
         }
 
-        return view('crm.students.edit', compact('student', 'classSections', 'assignableUsers'));
+        return view('crm.students.edit', compact('student', 'classSections', 'assignableUsers', 'schools'));
     }
 
     public function update(Request $request, Student $student)
     {
         $valid = $request->validate([
             'class_section_id' => 'required|exists:class_sections,id',
+            'school_id' => 'nullable|exists:schools,id',
             'name' => 'required|string|max:255',
             'father_name' => 'nullable|string|max:255',
             'roll_number' => 'nullable|string|max:50',
@@ -166,8 +168,27 @@ class StudentController extends Controller
         // Only admins can change assignment explicitly.
         if (! Auth::user()?->isAdmin()) {
             unset($valid['assigned_to']);
+            unset($valid['school_id']);
+        } else {
+            // Admin-only: allow changing school from profile edit.
+            // If selected class belongs to another school, move to same class/section in target school.
+            if (! empty($valid['school_id'])) {
+                $targetSchoolId = (int) $valid['school_id'];
+                $selectedClass = ClassSection::findOrFail((int) $valid['class_section_id']);
+
+                if ((int) $selectedClass->school_id !== $targetSchoolId) {
+                    $targetClass = ClassSection::firstOrCreate([
+                        'school_id' => $targetSchoolId,
+                        'academic_session_id' => (int) $selectedClass->academic_session_id,
+                        'class_name' => (string) $selectedClass->class_name,
+                        'section_name' => $selectedClass->section_name,
+                    ]);
+                    $valid['class_section_id'] = (int) $targetClass->id;
+                }
+            }
         }
 
+        unset($valid['school_id']); // derived through class_section_id only
         $student->update($valid);
 
         return redirect()->route('students.index')->with('success', __('Student updated.'));

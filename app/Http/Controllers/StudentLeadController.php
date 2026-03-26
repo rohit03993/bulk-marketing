@@ -135,8 +135,9 @@ class StudentLeadController extends Controller
             ->firstOrFail();
 
         $currentSessionId = AcademicSession::query()
-            ->where('is_current', true)
+            ->where('name', '2025-26')
             ->value('id')
+            ?? AcademicSession::query()->where('is_current', true)->value('id')
             ?? AcademicSession::query()->orderByDesc('starts_at')->value('id');
 
         if (! $currentSessionId) {

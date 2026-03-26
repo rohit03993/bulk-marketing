@@ -76,6 +76,9 @@ class CampaignController extends Controller
         $schools = School::orderBy('name')->get();
         $sessions = AcademicSession::orderByDesc('starts_at')->get();
         $templates = AisensyTemplate::orderBy('name')->get();
+        $fixedSessionId = AcademicSession::where('name', '2025-26')->value('id')
+            ?? AcademicSession::where('is_current', true)->value('id')
+            ?? AcademicSession::orderByDesc('starts_at')->value('id');
 
         $templatePreviews = [];
         foreach ($templates as $t) {
@@ -88,7 +91,7 @@ class CampaignController extends Controller
         }
 
         $schoolId = $request->old('school_id') ?? $request->query('school_id');
-        $sessionId = $request->old('academic_session_id') ?? $request->query('session_id');
+        $sessionId = $request->old('academic_session_id') ?? $request->query('session_id') ?? $fixedSessionId;
         $classSectionIds = $request->old('class_section_ids', []);
 
         $classSections = collect();
@@ -101,7 +104,7 @@ class CampaignController extends Controller
 
         return view('crm.campaigns.create', compact(
             'schools', 'sessions', 'templates', 'templatePreviews', 'classSections',
-            'schoolId', 'sessionId', 'classSectionIds'
+            'schoolId', 'sessionId', 'classSectionIds', 'fixedSessionId'
         ));
     }
 
@@ -174,7 +177,10 @@ class CampaignController extends Controller
             'media_url' => $mediaUrl,
             'media_filename' => $mediaFilename,
             'school_id' => $valid['school_id'],
-            'academic_session_id' => $valid['academic_session_id'] ?? null,
+            'academic_session_id' => $valid['academic_session_id']
+                ?? AcademicSession::where('name', '2025-26')->value('id')
+                ?? AcademicSession::where('is_current', true)->value('id')
+                ?? AcademicSession::orderByDesc('starts_at')->value('id'),
             'aisensy_template_id' => $valid['aisensy_template_id'],
             'status' => 'draft',
             'total_recipients' => count($recipients),

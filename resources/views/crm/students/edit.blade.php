@@ -15,6 +15,21 @@
                 <form method="POST" action="{{ route('students.update', $student) }}" class="space-y-4">
                     @csrf
                     @method('PATCH')
+                    @if (!empty($assignableUsers) && Auth::user()->isAdmin())
+                        <div>
+                            <x-input-label for="school_id" :value="__('School')" />
+                            <select id="school_id" name="school_id" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                @foreach ($schools as $s)
+                                    <option value="{{ $s->id }}"
+                                        {{ (int) old('school_id', $student->classSection?->school_id) === (int) $s->id ? 'selected' : '' }}>
+                                        {{ $s->name }}
+                                    </option>
+                                @endforeach
+                            </select>
+                            <p class="text-xs text-gray-500 mt-1">{{ __('If changed, student will be shifted to this school.') }}</p>
+                            <x-input-error :messages="$errors->get('school_id')" class="mt-1" />
+                        </div>
+                    @endif
                     <div>
                         <div class="flex items-center justify-between gap-2 flex-wrap">
                             <x-input-label for="class_section_id" :value="__('Class / Section')" />
@@ -22,7 +37,9 @@
                         </div>
                         <select id="class_section_id" name="class_section_id" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
                             @foreach ($classSections as $cs)
-                                <option value="{{ $cs->id }}" {{ old('class_section_id', request('class_section_id', $student->class_section_id)) == $cs->id ? 'selected' : '' }}>
+                                <option value="{{ $cs->id }}"
+                                        data-school-id="{{ $cs->school_id }}"
+                                        {{ old('class_section_id', request('class_section_id', $student->class_section_id)) == $cs->id ? 'selected' : '' }}>
                                     {{ $cs->full_name }} — {{ $cs->school->name }}
                                 </option>
                             @endforeach
@@ -92,6 +109,35 @@
                         <a href="{{ route('students.index') }}" class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">{{ __('Cancel') }}</a>
                     </div>
                 </form>
+                @if (!empty($assignableUsers) && Auth::user()->isAdmin())
+                    <script>
+                        (function () {
+                            const schoolSel = document.getElementById('school_id');
+                            const classSel = document.getElementById('class_section_id');
+                            if (!schoolSel || !classSel) return;
+
+                            const filterClassOptions = function () {
+                                const schoolId = schoolSel.value;
+                                let selectedStillVisible = false;
+
+                                Array.from(classSel.options).forEach(function (opt) {
+                                    const optSchool = opt.getAttribute('data-school-id');
+                                    const show = !schoolId || optSchool === schoolId;
+                                    opt.hidden = !show;
+                                    if (show && opt.value === classSel.value) selectedStillVisible = true;
+                                });
+
+                                if (!selectedStillVisible) {
+                                    const firstVisible = Array.from(classSel.options).find(o => !o.hidden);
+                                    if (firstVisible) classSel.value = firstVisible.value;
+                                }
+                            };
+
+                            schoolSel.addEventListener('change', filterClassOptions);
+                            filterClassOptions();
+                        })();
+                    </script>
+                @endif
             </div>
         </div>
     </div>

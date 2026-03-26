@@ -28,8 +28,11 @@ class StudentImportController extends Controller
     {
         $schools = School::orderBy('name')->get();
         $sessions = AcademicSession::orderByDesc('starts_at')->get();
+        $fixedSessionId = AcademicSession::where('name', '2025-26')->value('id')
+            ?? AcademicSession::where('is_current', true)->value('id')
+            ?? AcademicSession::orderByDesc('starts_at')->value('id');
 
-        return view('crm.student-imports.create', compact('schools', 'sessions'));
+        return view('crm.student-imports.create', compact('schools', 'sessions', 'fixedSessionId'));
     }
 
     public function store(Request $request)
@@ -53,9 +56,13 @@ class StudentImportController extends Controller
         $importSectionName = isset($valid['import_section_name']) && trim($valid['import_section_name']) !== '' ? trim($valid['import_section_name']) : null;
 
         $file = $request->file('file');
+        $defaultSessionId = AcademicSession::where('name', '2025-26')->value('id')
+            ?? AcademicSession::where('is_current', true)->value('id')
+            ?? AcademicSession::orderByDesc('starts_at')->value('id');
+
         $import = StudentImport::create([
             'school_id' => $valid['school_id'],
-            'academic_session_id' => $valid['academic_session_id'] ?? null,
+            'academic_session_id' => $valid['academic_session_id'] ?? $defaultSessionId,
             'import_class_name' => $importClassName,
             'import_section_name' => $importSectionName,
             'tag_name' => $valid['tag_name'] ?? null,
@@ -157,6 +164,7 @@ class StudentImportController extends Controller
         $mappings = $studentImport->columnMappings->keyBy('column_index');
         $schoolId = $studentImport->school_id;
         $sessionId = $studentImport->academic_session_id
+            ?? AcademicSession::where('name', '2025-26')->value('id')
             ?? AcademicSession::where('is_current', true)->value('id')
             ?? AcademicSession::orderByDesc('starts_at')->value('id');
 
