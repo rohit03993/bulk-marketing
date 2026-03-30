@@ -25,8 +25,9 @@ class StudentAssignmentController extends Controller
         if ($request->filled('session_id')) {
             $query->whereHas('classSection', fn ($q) => $q->where('academic_session_id', $request->session_id));
         }
-        if ($request->filled('class_section_id')) {
-            $query->where('class_section_id', $request->class_section_id);
+        if ($request->filled('class_name')) {
+            $classNameFilter = trim((string) $request->class_name);
+            $query->whereHas('classSection', fn ($q) => $q->where('class_name', $classNameFilter));
         }
         if ($request->input('only_unassigned') === '1') {
             $query->whereNull('assigned_to');
@@ -35,10 +36,22 @@ class StudentAssignmentController extends Controller
         $students = $query->paginate(25)->withQueryString();
         $schools = School::orderBy('name')->get();
         $sessions = AcademicSession::orderByDesc('starts_at')->get();
-        $classSections = ClassSection::with('school')->orderBy('class_name')->orderBy('section_name')->get();
+        $classSections = ClassSection::with('school')
+            ->when($request->filled('school_id'), fn ($q) => $q->where('school_id', $request->school_id))
+            ->when($request->filled('session_id'), fn ($q) => $q->where('academic_session_id', $request->session_id))
+            ->orderBy('class_name')
+            ->orderBy('section_name')
+            ->get();
+        $classOptions = $classSections
+            ->pluck('class_name')
+            ->map(fn ($v) => trim((string) $v))
+            ->filter()
+            ->unique()
+            ->sort()
+            ->values();
         $users = User::orderBy('name')->get();
 
-        return view('crm.students.assign', compact('students', 'schools', 'sessions', 'classSections', 'users'));
+        return view('crm.students.assign', compact('students', 'schools', 'sessions', 'classSections', 'classOptions', 'users'));
     }
 
     public function bulkAssign(Request $request)
