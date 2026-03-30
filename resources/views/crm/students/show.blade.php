@@ -169,6 +169,31 @@
                                 <dd class="text-gray-900">{{ $student->assigned_at?->format('d M Y') ?? '—' }}</dd>
                             </div>
                         </dl>
+                        <div class="mt-4 border-t border-slate-200 pt-3">
+                            <h4 class="text-xs font-semibold text-slate-700">{{ __('Transfer timeline') }}</h4>
+                            @if (($assignmentTransfers ?? collect())->isEmpty())
+                                <p class="mt-2 text-xs text-gray-500">{{ __('No transfers yet.') }}</p>
+                            @else
+                                <div class="mt-2 space-y-2">
+                                    @foreach ($assignmentTransfers as $t)
+                                        <div class="rounded-lg bg-slate-50 border border-slate-200 p-2">
+                                            <p class="text-xs text-slate-800">
+                                                {{ $t->fromUser?->name ?? __('Unassigned') }}
+                                                <span class="text-slate-400">→</span>
+                                                {{ $t->toUser?->name ?? '—' }}
+                                            </p>
+                                            <p class="mt-0.5 text-[11px] text-slate-600">
+                                                {{ __('By') }} {{ $t->transferredByUser?->name ?? '—' }}
+                                                · {{ $t->transferred_at?->format('d M Y, h:i A') ?? '—' }}
+                                            </p>
+                                            @if ($t->reason)
+                                                <p class="mt-0.5 text-[11px] text-slate-600">{{ __('Reason:') }} {{ $t->reason }}</p>
+                                            @endif
+                                        </div>
+                                    @endforeach
+                                </div>
+                            @endif
+                        </div>
                     </div>
                 </div>
 

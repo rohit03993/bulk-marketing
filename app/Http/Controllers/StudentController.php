@@ -9,6 +9,7 @@ use App\Models\CampaignRecipient;
 use App\Models\ClassSection;
 use App\Models\School;
 use App\Models\Student;
+use App\Models\StudentAssignmentTransfer;
 use App\Models\StudentCall;
 use App\Jobs\RunCampaignJob;
 use Illuminate\Http\Request;
@@ -270,8 +271,13 @@ class StudentController extends Controller
         $messages = $recipientsQuery->limit(100)->get();
 
         $templates = AisensyTemplate::orderBy('name')->get();
+        $assignmentTransfers = StudentAssignmentTransfer::where('student_id', $student->id)
+            ->with(['fromUser', 'toUser', 'transferredByUser'])
+            ->orderByDesc('transferred_at')
+            ->limit(20)
+            ->get();
 
-        return view('crm.students.show', compact('student', 'calls', 'messages', 'phones', 'templates'));
+        return view('crm.students.show', compact('student', 'calls', 'messages', 'phones', 'templates', 'assignmentTransfers'));
     }
 
     public function sendSingleMessage(Request $request, Student $student)

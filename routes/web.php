@@ -439,6 +439,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::resource('students', StudentController::class)->except('show', 'destroy');
         Route::get('students-assign', [StudentAssignmentController::class, 'form'])->name('students.assign');
         Route::post('students-assign', [StudentAssignmentController::class, 'bulkAssign'])->name('students.assign.perform');
+        Route::post('students-transfer', [StudentAssignmentController::class, 'bulkTransfer'])->name('students.transfer.perform');
 
         Route::get('student-imports', [StudentImportController::class, 'index'])->name('student-imports.index');
         Route::get('student-imports/create', [StudentImportController::class, 'create'])->name('student-imports.create');

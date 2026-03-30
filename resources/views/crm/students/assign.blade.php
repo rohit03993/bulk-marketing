@@ -1,7 +1,7 @@
 <x-app-layout>
     <x-slot name="header">
         <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <h2 class="font-semibold text-xl text-gray-800 leading-tight">{{ __('Assign leads to telecaller') }}</h2>
+            <h2 class="font-semibold text-xl text-gray-800 leading-tight">{{ __('Redistribute leads') }}</h2>
             <a href="{{ route('students.index') }}"
                class="inline-flex items-center px-3 py-1.5 border border-gray-300 rounded-md text-xs font-medium text-gray-700 bg-white hover:bg-gray-50">
                 {{ __('Back to students') }}
@@ -13,6 +13,15 @@
         <div class="max-w-6xl mx-auto sm:px-6 lg:px-8">
             @if (session('success'))
                 <div class="mb-4 rounded-md bg-green-50 p-4 text-sm text-green-800">{{ session('success') }}</div>
+            @endif
+            @if ($errors->any())
+                <div class="mb-4 rounded-md bg-red-50 p-4 text-sm text-red-800">
+                    <ul class="list-disc ml-5 space-y-1">
+                        @foreach ($errors->all() as $error)
+                            <li>{{ $error }}</li>
+                        @endforeach
+                    </ul>
+                </div>
             @endif
 
             <div class="bg-white shadow-sm sm:rounded-lg p-4 sm:p-6 space-y-4">
@@ -53,6 +62,16 @@
                                    {{ request('only_unassigned') === '1' ? 'checked' : '' }}>
                             <label for="only_unassigned" class="text-xs text-gray-700">{{ __('Only unassigned') }}</label>
                         </div>
+                        <div class="min-w-[180px]">
+                            <label class="block text-xs font-medium text-gray-500">{{ __('Currently assigned to') }}</label>
+                            <select name="current_assigned_to" class="mt-1 block w-full rounded-md border-gray-300 text-sm">
+                                <option value="">{{ __('All') }}</option>
+                                <option value="unassigned" {{ request('current_assigned_to') === 'unassigned' ? 'selected' : '' }}>{{ __('Unassigned') }}</option>
+                                @foreach (($telecallers ?? collect()) as $u)
+                                    <option value="{{ $u->id }}" {{ (string) request('current_assigned_to') === (string) $u->id ? 'selected' : '' }}>{{ $u->name }}</option>
+                                @endforeach
+                            </select>
+                        </div>
                         <button type="submit"
                                 class="px-4 py-2 bg-gray-800 text-white text-xs rounded-md hover:bg-gray-700">
                             {{ __('Filter') }}
@@ -66,28 +85,15 @@
                 @if ($students->isEmpty())
                     <p class="text-sm text-gray-500">{{ __('No students match the selected filters.') }}</p>
                 @else
-                    <form method="POST" action="{{ route('students.assign.perform') }}" class="space-y-3">
-                        @csrf
-                        <div class="flex flex-wrap gap-3 items-end">
-                            <div class="min-w-[200px]">
-                                <label class="block text-xs font-medium text-gray-500">{{ __('Assign selected to') }}</label>
-                                <select name="assigned_to" class="mt-1 block w-full rounded-md border-gray-300 text-sm" required>
-                                    <option value="">{{ __('Select telecaller') }}</option>
-                                    @foreach ($users as $u)
-                                        <option value="{{ $u->id }}">{{ $u->name }}</option>
-                                    @endforeach
-                                </select>
-                            </div>
-                            <button type="submit"
-                                    class="px-4 py-2 bg-emerald-600 text-white text-xs rounded-md hover:bg-emerald-700">
-                                {{ __('Assign leads') }}
-                            </button>
-                            <p class="text-xs text-gray-500 ml-auto">
-                                {{ __('Page shows :count students. Selection is per page.', ['count' => $students->count()]) }}
-                            </p>
+                    @php
+                        $currentOwnerFilter = (string) request('current_assigned_to', '');
+                    @endphp
+                    <div class="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                        <div class="flex flex-wrap items-center justify-between gap-2">
+                            <p class="text-xs font-semibold text-slate-700">{{ __('Lead selection') }}</p>
+                            <p class="text-xs text-slate-500">{{ __('Page shows :count students. Selection is per page.', ['count' => $students->count()]) }}</p>
                         </div>
-
-                        <div class="overflow-x-auto border border-gray-200 rounded-md">
+                        <div class="mt-3 overflow-x-auto border border-gray-200 rounded-md">
                             <table class="min-w-full divide-y divide-gray-200 text-sm">
                                 <thead class="bg-gray-50">
                                     <tr>
@@ -108,7 +114,7 @@
                                         @endphp
                                         <tr class="hover:bg-gray-50">
                                             <td class="px-3 py-2">
-                                                <input type="checkbox" name="student_ids[]" value="{{ $student->id }}"
+                                                <input type="checkbox" data-student-id="{{ $student->id }}"
                                                        class="student-select rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
                                             </td>
                                             <td class="px-3 py-2">
@@ -138,8 +144,48 @@
                                 </tbody>
                             </table>
                         </div>
+                        <div class="mt-3">{{ $students->links() }}</div>
+                    </div>
 
-                        <div>{{ $students->links() }}</div>
+                    <form method="POST" action="{{ route('students.transfer.perform') }}" class="rounded-lg border border-indigo-200 bg-indigo-50 p-3 space-y-3 js-lead-action-form">
+                        @csrf
+                        <div class="flex items-center justify-between gap-2">
+                            <p class="text-sm font-semibold text-indigo-800">{{ __('Redistribute leads') }}</p>
+                            <span class="text-[11px] text-indigo-700">{{ __('Secure flow with audit log') }}</span>
+                        </div>
+                        <div class="grid grid-cols-1 sm:grid-cols-4 gap-2">
+                            <div>
+                                <label class="block text-xs font-medium text-gray-500">{{ __('Redistribute to') }}</label>
+                                <select name="transfer_to" class="mt-1 block w-full rounded-md border-gray-300 text-sm" required>
+                                    <option value="">{{ __('Select telecaller') }}</option>
+                                    @foreach (($telecallers ?? $users) as $u)
+                                        @if ($currentOwnerFilter !== '' && $currentOwnerFilter !== 'unassigned' && $currentOwnerFilter === (string) $u->id)
+                                            @continue
+                                        @endif
+                                        <option value="{{ $u->id }}">{{ $u->name }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-gray-500">{{ __('Reason (optional)') }}</label>
+                                <input type="text" name="transfer_reason" maxlength="255" class="mt-1 block w-full rounded-md border-gray-300 text-sm" placeholder="{{ __('Workload balancing') }}">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-gray-500">{{ __('Type to confirm') }}</label>
+                                <input type="text" name="confirm_phrase" class="mt-1 block w-full rounded-md border-gray-300 text-sm" placeholder="TRANSFER" required>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-gray-500">{{ __('Admin password') }}</label>
+                                <input type="password" name="admin_password" class="mt-1 block w-full rounded-md border-gray-300 text-sm" autocomplete="current-password" required>
+                            </div>
+                        </div>
+                        <div class="js-selected-ids"></div>
+                        <button type="submit" class="w-full px-4 py-2 bg-indigo-700 text-white text-xs rounded-md hover:bg-indigo-800">
+                            {{ __('Redistribute selected leads') }}
+                        </button>
+                        <p class="text-[11px] text-indigo-800">
+                            {{ __('Lead status, follow-up date, call notes and call history stay unchanged. Only owner changes with timeline log.') }}
+                        </p>
                     </form>
                 @endif
             </div>
@@ -155,7 +201,32 @@
                 });
             });
         }
-
+        const actionForms = document.querySelectorAll('.js-lead-action-form');
+        const selectedIds = function () {
+            return Array.from(document.querySelectorAll('.student-select:checked'))
+                .map(function (el) { return el.getAttribute('data-student-id'); })
+                .filter(Boolean);
+        };
+        actionForms.forEach(function (formEl) {
+            formEl.addEventListener('submit', function (e) {
+                const ids = selectedIds();
+                if (!ids.length) {
+                    e.preventDefault();
+                    alert('Select at least one lead from the table first.');
+                    return;
+                }
+                const holder = formEl.querySelector('.js-selected-ids');
+                if (!holder) return;
+                holder.innerHTML = '';
+                ids.forEach(function (id) {
+                    const input = document.createElement('input');
+                    input.type = 'hidden';
+                    input.name = 'student_ids[]';
+                    input.value = id;
+                    holder.appendChild(input);
+                });
+            });
+        });
     </script>
 </x-app-layout>
 

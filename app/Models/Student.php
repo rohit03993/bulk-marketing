@@ -79,6 +79,11 @@ class Student extends Model
         return $this->belongsTo(User::class, 'assigned_by');
     }
 
+    public function assignmentTransfers()
+    {
+        return $this->hasMany(StudentAssignmentTransfer::class);
+    }
+
     public function getWhatsappPhones(): array
     {
         $phones = [];
