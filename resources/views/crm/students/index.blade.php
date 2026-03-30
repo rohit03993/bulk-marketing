@@ -66,11 +66,11 @@
                     </div>
                     <div class="min-w-[140px]">
                         <label class="block text-xs font-medium text-gray-500">{{ __('Class') }}</label>
-                        <select name="class_section_id" class="mt-1 block w-full rounded-md border-gray-300 text-sm">
+                        <select name="class_name" class="mt-1 block w-full rounded-md border-gray-300 text-sm">
                             <option value="">{{ __('All') }}</option>
-                            @foreach ($classSections as $cs)
-                                <option value="{{ $cs->id }}" {{ request('class_section_id') == $cs->id ? 'selected' : '' }}>
-                                    {{ $cs->class_name }}{{ $cs->section_name ? ' - ' . $cs->section_name : '' }}
+                            @foreach (($classOptions ?? []) as $cls)
+                                <option value="{{ $cls }}" {{ (string) request('class_name') === (string) $cls ? 'selected' : '' }}>
+                                    {{ $cls }}
                                 </option>
                             @endforeach
                         </select>

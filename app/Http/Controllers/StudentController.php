@@ -28,8 +28,9 @@ class StudentController extends Controller
         if ($request->filled('session_id')) {
             $query->whereHas('classSection', fn ($q) => $q->where('academic_session_id', $request->session_id));
         }
-        if ($request->filled('class_section_id')) {
-            $query->where('class_section_id', $request->class_section_id);
+        if ($request->filled('class_name')) {
+            $classNameFilter = trim((string) $request->class_name);
+            $query->whereHas('classSection', fn ($q) => $q->where('class_name', $classNameFilter));
         }
         if ($request->filled('lead_status') && $request->lead_status !== 'all') {
             if ($request->lead_status === 'converted') {
@@ -83,7 +84,16 @@ class StudentController extends Controller
             ->orderBy('section_name')
             ->get();
 
-        return view('crm.students.index', compact('students', 'schools', 'sessions', 'classSections', 'assignedToOptions'));
+        // Clean "Class" filter options: unique class_name only (9,10,11...) to avoid repeated values.
+        $classOptions = $classSections
+            ->pluck('class_name')
+            ->map(fn ($v) => trim((string) $v))
+            ->filter()
+            ->unique()
+            ->sort()
+            ->values();
+
+        return view('crm.students.index', compact('students', 'schools', 'sessions', 'classSections', 'classOptions', 'assignedToOptions'));
     }
 
     public function create()
