@@ -69,9 +69,36 @@
                         <select name="class_section_id" class="mt-1 block w-full rounded-md border-gray-300 text-sm">
                             <option value="">{{ __('All') }}</option>
                             @foreach ($classSections as $cs)
-                                <option value="{{ $cs->id }}" {{ request('class_section_id') == $cs->id ? 'selected' : '' }}>{{ $cs->full_name }} ({{ $cs->school->name }})</option>
+                                <option value="{{ $cs->id }}" {{ request('class_section_id') == $cs->id ? 'selected' : '' }}>
+                                    {{ $cs->class_name }}{{ $cs->section_name ? ' - ' . $cs->section_name : '' }}
+                                </option>
                             @endforeach
                         </select>
+                    </div>
+                    <div class="min-w-[160px]">
+                        <label class="block text-xs font-medium text-gray-500">{{ __('Lead status') }}</label>
+                        <select name="lead_status" class="mt-1 block w-full rounded-md border-gray-300 text-sm">
+                            <option value="all">{{ __('All') }}</option>
+                            <option value="converted" {{ request('lead_status') === 'converted' ? 'selected' : '' }}>{{ __('Converted (Walk-in + Admission)') }}</option>
+                            <option value="lead" {{ request('lead_status') === 'lead' ? 'selected' : '' }}>{{ __('Uncalled') }}</option>
+                            <option value="interested" {{ request('lead_status') === 'interested' ? 'selected' : '' }}>{{ __('Interested') }}</option>
+                            <option value="follow_up_later" {{ request('lead_status') === 'follow_up_later' ? 'selected' : '' }}>{{ __('Follow-up Later') }}</option>
+                            <option value="walkin_done" {{ request('lead_status') === 'walkin_done' ? 'selected' : '' }}>{{ __('Walk-in Done') }}</option>
+                            <option value="admission_done" {{ request('lead_status') === 'admission_done' ? 'selected' : '' }}>{{ __('Admission Done') }}</option>
+                            <option value="not_interested" {{ request('lead_status') === 'not_interested' ? 'selected' : '' }}>{{ __('Not Interested') }}</option>
+                        </select>
+                    </div>
+                    <div class="min-w-[160px]">
+                        <label class="flex items-center gap-2 text-xs font-medium text-gray-500">
+                            <input
+                                type="checkbox"
+                                name="blocked"
+                                value="1"
+                                class="rounded border-gray-300 text-gray-900 focus:ring-gray-500"
+                                {{ request('blocked') ? 'checked' : '' }}
+                            />
+                            {{ __('Blocked leads') }}
+                        </label>
                     </div>
                     <div class="flex-1 min-w-[160px]">
                         <label class="block text-xs font-medium text-gray-500">{{ __('Search name / phone / roll') }}</label>

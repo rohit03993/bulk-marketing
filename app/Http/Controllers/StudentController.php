@@ -13,6 +13,7 @@ use App\Models\StudentCall;
 use App\Jobs\RunCampaignJob;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Schema;
 
 class StudentController extends Controller
 {
@@ -30,12 +31,32 @@ class StudentController extends Controller
         if ($request->filled('class_section_id')) {
             $query->where('class_section_id', $request->class_section_id);
         }
+        if ($request->filled('lead_status') && $request->lead_status !== 'all') {
+            if ($request->lead_status === 'converted') {
+                $query->whereIn('lead_status', ['walkin_done', 'admission_done']);
+            } else {
+                $query->where('lead_status', $request->lead_status);
+            }
+        }
+
+        // Blocked leads drill-down:
+        // `is_call_blocked = true` covers both "Not Interested" and "max_not_connected_attempts" blocks.
+        if ($request->boolean('blocked')) {
+            if (Schema::hasColumn('students', 'is_call_blocked')) {
+                $query->where('is_call_blocked', 1);
+            } else {
+                // Fallback: no column exists -> show nothing instead of throwing.
+                $query->whereRaw('1=0');
+            }
+        }
         if ($request->filled('search')) {
             $s = $request->search;
             $query->where(fn ($q) => $q->where('name', 'like', "%{$s}%")
                 ->orWhere('father_name', 'like', "%{$s}%")
                 ->orWhere('roll_number', 'like', "%{$s}%")
-                ->orWhere('whatsapp_phone_primary', 'like', "%{$s}%"));
+                ->orWhere('admission_number', 'like', "%{$s}%")
+                ->orWhere('whatsapp_phone_primary', 'like', "%{$s}%")
+                ->orWhere('whatsapp_phone_secondary', 'like', "%{$s}%"));
         }
 
         // Optional filter by assignee (admin only).
@@ -55,7 +76,12 @@ class StudentController extends Controller
         $students = $query->paginate(20)->withQueryString();
         $schools = School::orderBy('name')->get();
         $sessions = AcademicSession::orderByDesc('starts_at')->get();
-        $classSections = ClassSection::with('school')->orderBy('class_name')->orderBy('section_name')->get();
+        $classSections = ClassSection::with('school')
+            ->when($request->filled('school_id'), fn ($q) => $q->where('school_id', $request->school_id))
+            ->when($request->filled('session_id'), fn ($q) => $q->where('academic_session_id', $request->session_id))
+            ->orderBy('class_name')
+            ->orderBy('section_name')
+            ->get();
 
         return view('crm.students.index', compact('students', 'schools', 'sessions', 'classSections', 'assignedToOptions'));
     }

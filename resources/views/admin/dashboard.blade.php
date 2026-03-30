@@ -139,6 +139,108 @@
                     </div>
                 </div>
 
+            {{-- Call reporting (Pending + New vs Follow-up) --}}
+            <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden p-5">
+                <div class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
+                    <div>
+                        <p class="text-sm font-semibold text-slate-900">{{ __('Call reporting') }}</p>
+                        <p class="mt-0.5 text-xs text-slate-500">
+                            {{ __('Pending = today queue + due/overdue follow-ups. New call = first call of student.') }}
+                        </p>
+                    </div>
+                </div>
+
+                <form method="GET" action="{{ url()->current() }}" class="mt-4 flex flex-wrap gap-3 items-end">
+                    <div>
+                        <label class="block text-xs font-medium text-slate-600">{{ __('From') }}</label>
+                        <input type="date" name="calls_from" value="{{ $callsFrom ?? now()->toDateString() }}"
+                               class="mt-1 block rounded-xl border-slate-200 text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-600">{{ __('To') }}</label>
+                        <input type="date" name="calls_to" value="{{ $callsTo ?? now()->toDateString() }}"
+                               class="mt-1 block rounded-xl border-slate-200 text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-600">{{ __('Day (for daily table)') }}</label>
+                        <select name="calls_day" class="mt-1 block rounded-xl border-slate-200 text-sm">
+                            @foreach (($callsDays ?? []) as $d)
+                                <option value="{{ $d }}" {{ (string) ($callsSelectedDay ?? '') === (string) $d ? 'selected' : '' }}>
+                                    {{ $d }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <button type="submit" class="px-4 py-2 rounded-xl bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700">
+                        {{ __('Apply') }}
+                    </button>
+                </form>
+
+                <div class="mt-5 overflow-x-auto">
+                    <table class="min-w-full divide-y divide-slate-200 text-sm">
+                        <thead class="bg-slate-50">
+                            <tr>
+                                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-600">{{ __('Telecaller') }}</th>
+                                <th class="px-4 py-3 text-right text-xs font-semibold text-slate-600">{{ __('Pending total') }}</th>
+                                <th class="px-4 py-3 text-right text-xs font-semibold text-slate-600">{{ __('Pending new') }}</th>
+                                <th class="px-4 py-3 text-right text-xs font-semibold text-slate-600">{{ __('Pending follow-up') }}</th>
+                                <th class="px-4 py-3 text-right text-xs font-semibold text-emerald-700">{{ __('New calls (range)') }}</th>
+                                <th class="px-4 py-3 text-right text-xs font-semibold text-amber-700">{{ __('Follow-up calls (range)') }}</th>
+                                <th class="px-4 py-3 text-right text-xs font-semibold text-slate-600">{{ __('Calls total (range)') }}</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100 bg-white">
+                            @foreach ($telecallerAggs as $t)
+                                @php
+                                    $tid = (int) ($t->telecaller_id ?? 0);
+                                    $p = $pendingByTelecaller[$tid] ?? ['pending_total' => 0, 'pending_new' => 0, 'pending_followup' => 0];
+                                    $rt = $callsRangeTotals[$tid] ?? ['new_calls' => 0, 'followup_calls' => 0, 'total_calls' => 0];
+                                @endphp
+                                <tr class="hover:bg-slate-50/60">
+                                    <td class="px-4 py-3 text-slate-800 font-medium">{{ $t->telecaller_name }}</td>
+                                    <td class="px-4 py-3 text-right text-slate-700 font-semibold">{{ (int) $p['pending_total'] }}</td>
+                                    <td class="px-4 py-3 text-right text-slate-700">{{ (int) $p['pending_new'] }}</td>
+                                    <td class="px-4 py-3 text-right text-slate-700">{{ (int) $p['pending_followup'] }}</td>
+                                    <td class="px-4 py-3 text-right text-emerald-700 font-semibold">{{ (int) $rt['new_calls'] }}</td>
+                                    <td class="px-4 py-3 text-right text-amber-700 font-semibold">{{ (int) $rt['followup_calls'] }}</td>
+                                    <td class="px-4 py-3 text-right text-slate-700 font-semibold">{{ (int) $rt['total_calls'] }}</td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="mt-6">
+                    <p class="text-sm font-semibold text-slate-900">{{ __('Daily calls for') }}: {{ $callsSelectedDay }}</p>
+                    <div class="mt-3 overflow-x-auto">
+                        <table class="min-w-full divide-y divide-slate-200 text-sm">
+                            <thead class="bg-slate-50">
+                                <tr>
+                                    <th class="px-4 py-3 text-left text-xs font-semibold text-slate-600">{{ __('Telecaller') }}</th>
+                                    <th class="px-4 py-3 text-right text-xs font-semibold text-emerald-700">{{ __('New calls') }}</th>
+                                    <th class="px-4 py-3 text-right text-xs font-semibold text-amber-700">{{ __('Follow-up calls') }}</th>
+                                    <th class="px-4 py-3 text-right text-xs font-semibold text-slate-600">{{ __('Total calls') }}</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-100 bg-white">
+                                @foreach ($telecallerAggs as $t)
+                                    @php
+                                        $tid = (int) ($t->telecaller_id ?? 0);
+                                        $d = $callsDailySelected[$tid] ?? ['new_calls' => 0, 'followup_calls' => 0, 'total_calls' => 0];
+                                    @endphp
+                                    <tr class="hover:bg-slate-50/60">
+                                        <td class="px-4 py-3 text-slate-800 font-medium">{{ $t->telecaller_name }}</td>
+                                        <td class="px-4 py-3 text-right text-emerald-700 font-semibold">{{ (int) $d['new_calls'] }}</td>
+                                        <td class="px-4 py-3 text-right text-amber-700 font-semibold">{{ (int) $d['followup_calls'] }}</td>
+                                        <td class="px-4 py-3 text-right text-slate-700 font-semibold">{{ (int) $d['total_calls'] }}</td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
                 {{-- Telecaller breakdown --}}
                 <div class="space-y-6">
                     <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">

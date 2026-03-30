@@ -31,6 +31,23 @@
                 </div>
             </div>
 
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
+                <div class="bg-white rounded-2xl border border-emerald-200 shadow-sm p-4">
+                    <div class="text-xs text-slate-500">{{ __('New calls') }}</div>
+                    <div class="mt-1 text-2xl font-bold text-emerald-700">{{ $summary['new_calls'] ?? 0 }}</div>
+                    <div class="mt-1 text-[11px] text-slate-500">
+                        {{ __('First-ever call per student') }}
+                    </div>
+                </div>
+                <div class="bg-white rounded-2xl border border-amber-200 shadow-sm p-4">
+                    <div class="text-xs text-slate-500">{{ __('Follow-up calls') }}</div>
+                    <div class="mt-1 text-2xl font-bold text-amber-700">{{ $summary['followup_calls'] ?? 0 }}</div>
+                    <div class="mt-1 text-[11px] text-slate-500">
+                        {{ __('Any call after first-ever call') }}
+                    </div>
+                </div>
+            </div>
+
             <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-4">
                 <form method="GET" action="{{ route('calls.report') }}" class="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
                     @if ($isAdmin)

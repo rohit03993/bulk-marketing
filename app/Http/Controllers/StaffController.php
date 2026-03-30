@@ -10,6 +10,7 @@ use App\Models\CampaignRecipient;
 use App\Models\School;
 use App\Models\ClassSection;
 use App\Services\TelecallerScoreService;
+use App\Services\TelecallerCallReportingService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\DB;
@@ -18,7 +19,7 @@ use Illuminate\Support\Carbon;
 
 class StaffController extends Controller
 {
-    private const LEAD_STATUSES = ['lead', 'interested', 'not_interested', 'walkin_done', 'admission_done', 'follow_up_later'];
+    private const LEAD_STATUSES = ['lead', 'interested', 'not_interested', 'walkin_done', 'admission_done', 'follow_up_later', 'converted'];
 
     public function show(Request $request, User $staff)
     {
@@ -26,6 +27,11 @@ class StaffController extends Controller
 
         $now = now();
         $today = $now->copy();
+
+        // Reporting session for admin call reporting (locked to 2025-26 by default).
+        $reportSessionId = \App\Models\AcademicSession::where('name', '2025-26')->value('id')
+            ?? \App\Models\AcademicSession::where('is_current', true)->value('id')
+            ?? \App\Models\AcademicSession::orderByDesc('starts_at')->value('id');
 
         $scoreService = new TelecallerScoreService();
         $dailyTarget = 25;
@@ -73,6 +79,49 @@ class StaffController extends Controller
             $rangeEnd = $rangeStart->copy()->endOfDay();
         }
 
+        // Telecaller call reporting (Pending + New vs Follow-up).
+        $reportService = new TelecallerCallReportingService();
+        $pending = $reportService->pendingCallsCounts([$staff->id], (int) $reportSessionId, now())[$staff->id] ?? [
+            'pending_total' => 0,
+            'pending_new' => 0,
+            'pending_followup' => 0,
+        ];
+
+        // Keep UI light: cap daily table to last 14 days.
+        $maxDays = 14;
+        if ($rangeEnd->diffInDays($rangeStart) + 1 > $maxDays) {
+            $rangeStart = $rangeEnd->copy()->subDays($maxDays - 1)->startOfDay();
+        }
+
+        $dailySplit = $reportService->dailyCallsSplit(
+            [$staff->id],
+            (int) $reportSessionId,
+            $rangeStart,
+            $rangeEnd
+        );
+
+        // Normalize into rows: [date, new_calls, followup_calls, total_calls]
+        $dailySplitRows = [];
+        $callsRangeTotals = ['new_calls' => 0, 'followup_calls' => 0, 'total_calls' => 0];
+        foreach ($dailySplit as $date => $byTelecaller) {
+            $c = $byTelecaller[$staff->id] ?? ['new_calls' => 0, 'followup_calls' => 0, 'total_calls' => 0];
+            $c['new_calls'] = (int) ($c['new_calls'] ?? 0);
+            $c['followup_calls'] = (int) ($c['followup_calls'] ?? 0);
+            $c['total_calls'] = (int) ($c['total_calls'] ?? 0);
+            $dailySplitRows[] = [
+                'date' => $date,
+                'new_calls' => $c['new_calls'],
+                'followup_calls' => $c['followup_calls'],
+                'total_calls' => $c['total_calls'],
+            ];
+            $callsRangeTotals['new_calls'] += $c['new_calls'];
+            $callsRangeTotals['followup_calls'] += $c['followup_calls'];
+            $callsRangeTotals['total_calls'] += $c['total_calls'];
+        }
+        usort($dailySplitRows, fn ($a, $b) => strcmp($b['date'], $a['date']));
+
+        $telecallerOptions = \App\Models\User::where('is_admin', false)->orderBy('name')->get();
+
         $callsInRange = StudentCall::where('user_id', $staff->id)
             ->whereBetween('called_at', [$rangeStart, $rangeEnd])
             ->get();
@@ -103,7 +152,11 @@ class StaffController extends Controller
             ->when($filterAddedByMe, fn ($q) => $q->where('assigned_by', $staff->id))
             ->orderBy('name');
         if ($filterLeadStatus !== null) {
-            $studentsQuery->where('lead_status', $filterLeadStatus);
+            if ($filterLeadStatus === 'converted') {
+                $studentsQuery->whereIn('lead_status', ['walkin_done', 'admission_done']);
+            } else {
+                $studentsQuery->where('lead_status', $filterLeadStatus);
+            }
         }
         if ($filterSchoolId) {
             $studentsQuery->whereHas('classSection', function ($q) use ($filterSchoolId) {
@@ -143,6 +196,7 @@ class StaffController extends Controller
         $leadStatusOptions = [
             'lead' => __('Uncalled'),
             'interested' => __('Interested'),
+            'converted' => __('Converted (Walk-in + Admission)'),
             'not_interested' => __('Not Interested'),
             'walkin_done' => __('Walk-in Done'),
             'admission_done' => __('Admission Done'),
@@ -175,6 +229,10 @@ class StaffController extends Controller
             'staff' => $staff,
             'scoreToday' => $scoreToday,
             'scoreOverall' => $scoreOverall,
+            'pendingCalls' => $pending,
+            'callsRangeTotals' => $callsRangeTotals,
+            'dailyNewFollowup' => $dailySplitRows,
+            'telecallerOptions' => $telecallerOptions,
             'callsSummary' => [
                 'total' => $callsTotal,
                 'connected' => $callsConnected,
@@ -270,7 +328,11 @@ class StaffController extends Controller
 
         // Re-apply filters from the staff detail page so "all filtered" mode is consistent.
         if ($request->filled('lead_status') && in_array($request->input('lead_status'), self::LEAD_STATUSES, true)) {
-            $baseQuery->where('lead_status', $request->input('lead_status'));
+            if ($request->input('lead_status') === 'converted') {
+                $baseQuery->whereIn('lead_status', ['walkin_done', 'admission_done']);
+            } else {
+                $baseQuery->where('lead_status', $request->input('lead_status'));
+            }
         }
         if ($request->filled('school_id')) {
             $schoolId = $request->input('school_id');

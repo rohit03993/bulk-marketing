@@ -27,13 +27,53 @@
 
     <div class="py-8 bg-gradient-to-b from-sky-50 to-white min-h-screen">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
+            {{-- Telecaller quick switch (admin) --}}
+            @if (isset($telecallerOptions) && $telecallerOptions->isNotEmpty())
+                <div class="bg-blue-50 rounded-2xl shadow-lg shadow-blue-100/50 border border-blue-200 p-5">
+                    <div class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
+                        <div>
+                            <p class="text-sm font-semibold text-blue-900">{{ __('Telecaller selection') }}</p>
+                            <p class="text-xs text-slate-500 mt-0.5">{{ __('Jump to another staff performance page') }}</p>
+                        </div>
+                        <div class="min-w-[260px]">
+                            <label class="block text-xs font-medium text-blue-700">{{ __('Telecaller') }}</label>
+                            <select id="adminStaffSelect"
+                                    class="mt-1 block w-full rounded-lg border-blue-200 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500 text-slate-700">
+                                @foreach ($telecallerOptions as $u)
+                                    <option value="{{ $u->id }}" {{ (int) $u->id === (int) $staff->id ? 'selected' : '' }}>
+                                        {{ $u->name }}
+                                    </option>
+                                @endforeach
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <script>
+                    (function () {
+                        const sel = document.getElementById('adminStaffSelect');
+                        if (!sel) return;
+                        sel.addEventListener('change', function () {
+                            window.location.href = '{{ url('admin/staff') }}/' + this.value;
+                        });
+                    })();
+                </script>
+            @endif
+
             {{-- Filters --}}
-            <div class="bg-white rounded-2xl shadow-lg shadow-blue-100/50 border border-blue-100 p-5">
-                <div class="flex items-center gap-2 mb-4">
-                    <span class="flex h-8 w-1 rounded-full bg-blue-500"></span>
+            <div class="bg-blue-50 rounded-2xl shadow-lg shadow-blue-100/50 border border-blue-200 p-5">
+                <div class="flex items-center gap-2 mb-5 rounded-xl bg-blue-100/70 border border-blue-200/70 px-4 py-3">
+                    <span class="flex h-8 w-1 rounded-full bg-blue-600"></span>
                     <p class="text-sm font-semibold text-blue-900">{{ __('Filter data') }}</p>
                 </div>
-                <form method="get" action="{{ route('admin.staff.show', $staff) }}" class="flex flex-wrap items-end gap-4">
+                @php
+                    $selectedSchoolId = (int) request()->input('school_id', 0);
+                    $selectedClassSectionId = (int) request()->input('class_section_id', 0);
+                    $addedByMeChecked = (bool) request()->boolean('added_by_me');
+                    $schools = $schools ?? collect();
+                    $classSections = $classSections ?? collect();
+                    $leadStatusOptions = $leadStatusOptions ?? [];
+                @endphp
+                <form id="staffFilterForm" method="get" action="{{ route('admin.staff.show', $staff) }}" class="flex flex-wrap items-end gap-4">
                     <div>
                         <label for="from_date" class="block text-xs font-medium text-blue-700">{{ __('From date') }}</label>
                         <input type="date" id="from_date" name="from_date" value="{{ $filterFrom }}"
@@ -44,11 +84,31 @@
                         <input type="date" id="to_date" name="to_date" value="{{ $filterTo }}"
                                class="mt-1 block w-full rounded-lg border-blue-200 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500 text-slate-700">
                     </div>
+                    <div class="min-w-[230px]">
+                        <label class="block text-[11px] font-semibold text-blue-700">{{ __('Quick range') }}</label>
+                        <div class="mt-1 flex flex-wrap items-center gap-2">
+                            <button type="button"
+                                    class="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold bg-white hover:bg-blue-50 text-blue-800 border border-blue-200 transition"
+                                    onclick="setStaffFilterRange('today')">
+                                {{ __('Today') }}
+                            </button>
+                            <button type="button"
+                                    class="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold bg-white hover:bg-blue-50 text-blue-800 border border-blue-200 transition"
+                                    onclick="setStaffFilterRange('7')">
+                                {{ __('Last 7 days') }}
+                            </button>
+                            <button type="button"
+                                    class="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold bg-white hover:bg-blue-50 text-blue-800 border border-blue-200 transition"
+                                    onclick="setStaffFilterRange('30')">
+                                {{ __('Last 30 days') }}
+                            </button>
+                        </div>
+                    </div>
                     <div>
                         <label for="lead_status" class="block text-xs font-medium text-blue-700">{{ __('Lead status') }}</label>
                         <select id="lead_status" name="lead_status" class="mt-1 block w-full rounded-lg border-blue-200 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500 text-slate-700">
                             <option value="">{{ __('All') }}</option>
-                            @foreach ($leadStatusOptions ?? [] as $value => $label)
+                            @foreach ($leadStatusOptions as $value => $label)
                                 <option value="{{ $value }}" {{ ($filterLeadStatus ?? '') === $value ? 'selected' : '' }}>{{ $label }}</option>
                             @endforeach
                         </select>
@@ -57,8 +117,8 @@
                         <label for="school_id" class="block text-xs font-medium text-blue-700">{{ __('School') }}</label>
                         <select id="school_id" name="school_id" class="mt-1 block w-full rounded-lg border-blue-200 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500 text-slate-700">
                             <option value="">{{ __('All') }}</option>
-                            @foreach ($schools ?? [] as $school)
-                                <option value="{{ $school->id }}" {{ (request('school_id') == $school->id) ? 'selected' : '' }}>
+                            @foreach ($schools as $school)
+                                <option value="{{ $school->id }}" {{ $selectedSchoolId === (int) $school->id ? 'selected' : '' }}>
                                     {{ $school->name }}
                                 </option>
                             @endforeach
@@ -68,8 +128,8 @@
                         <label for="class_section_id" class="block text-xs font-medium text-blue-700">{{ __('Class / Section') }}</label>
                         <select id="class_section_id" name="class_section_id" class="mt-1 block w-full rounded-lg border-blue-200 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500 text-slate-700">
                             <option value="">{{ __('All') }}</option>
-                            @foreach ($classSections ?? [] as $cs)
-                                <option value="{{ $cs->id }}" {{ (request('class_section_id') == $cs->id) ? 'selected' : '' }}>
+                            @foreach ($classSections as $cs)
+                                <option value="{{ $cs->id }}" {{ $selectedClassSectionId === (int) $cs->id ? 'selected' : '' }}>
                                     {{ $cs->class_name }}{{ $cs->section_name ? ' - ' . $cs->section_name : '' }}
                                 </option>
                             @endforeach
@@ -81,7 +141,7 @@
                                 type="checkbox"
                                 name="added_by_me"
                                 value="1"
-                                {{ request('added_by_me') ? 'checked' : '' }}
+                                {{ $addedByMeChecked ? 'checked' : '' }}
                                 class="rounded border-blue-200 text-blue-600 focus:ring-blue-500"
                             />
                             {{ __('Added by this telecaller') }}
@@ -94,7 +154,48 @@
                         {{ __('Clear') }}
                     </a>
                 </form>
+                <script>
+                    function setStaffFilterRange(mode) {
+                        const fromEl = document.getElementById('from_date');
+                        const toEl = document.getElementById('to_date');
+                        const form = document.getElementById('staffFilterForm');
+                        if (!fromEl || !toEl || !form) return;
+
+                        const today = new Date();
+                        const toISO = (d) => {
+                            const yyyy = d.getFullYear();
+                            const mm = String(d.getMonth() + 1).padStart(2, '0');
+                            const dd = String(d.getDate()).padStart(2, '0');
+                            return yyyy + '-' + mm + '-' + dd;
+                        };
+
+                        if (mode === 'today') {
+                            fromEl.value = toISO(today);
+                            toEl.value = toISO(today);
+                        } else {
+                            const days = parseInt(mode, 10) || 7;
+                            const from = new Date(today);
+                            from.setDate(today.getDate() - (days - 1));
+                            fromEl.value = toISO(from);
+                            toEl.value = toISO(today);
+                        }
+                        form.submit();
+                    }
+                </script>
             </div>
+
+            @php
+                $exitedFilterUrl = route('admin.staff.show', array_merge(
+                    ['staff' => $staff->id],
+                    request()->except('lead_status', 'students_page'),
+                    ['lead_status' => 'not_interested']
+                ));
+                $convertedFilterUrl = route('admin.staff.show', array_merge(
+                    ['staff' => $staff->id],
+                    request()->except('lead_status', 'students_page'),
+                    ['lead_status' => 'converted']
+                ));
+            @endphp
 
             {{-- Top summary cards --}}
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
@@ -124,27 +225,29 @@
                 <div class="bg-white rounded-2xl shadow-lg shadow-blue-100/40 border border-blue-100 p-5 overflow-hidden relative">
                     <div class="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-blue-500/15 to-transparent rounded-bl-full"></div>
                     <p class="text-xs font-medium text-blue-600">
-                        {{ request('added_by_me') ? __('Leads added by telecaller') : __('Students assigned') }}
+                        {{ $addedByMeChecked ? __('Leads added by telecaller') : __('Students assigned') }}
                     </p>
                     <p class="mt-2 text-3xl font-extrabold text-blue-700">
                         {{ $assignedTotal ?? $students->total() }}
                     </p>
                     <p class="mt-1 text-xs text-slate-500">
                         {{ __('Converted:') }}
-                        <span class="font-semibold text-emerald-700">
+                        <a href="{{ $convertedFilterUrl }}" class="font-semibold text-emerald-700 hover:text-emerald-800 hover:underline">
                             {{ ($convertedWalkin + $convertedAdmission) }}
-                        </span>
+                        </a>
                         · {{ __('Exited:') }}
-                        <span class="font-semibold text-rose-700">
+                        <a href="{{ $exitedFilterUrl }}" class="font-semibold text-rose-700 hover:text-rose-800 hover:underline">
                             {{ $exitedNotInterested }}
-                        </span>
+                        </a>
                     </p>
                 </div>
                 <div class="bg-white rounded-2xl shadow-lg shadow-indigo-100/40 border border-indigo-100 p-5 overflow-hidden relative">
                     <div class="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-indigo-400/20 to-transparent rounded-bl-full"></div>
                     <p class="text-xs font-medium text-indigo-600">{{ __('Converted') }}</p>
                     <p class="mt-2 text-3xl font-extrabold text-indigo-700">
-                        {{ ($convertedWalkin + $convertedAdmission) }}
+                        <a href="{{ $convertedFilterUrl }}" class="hover:underline">
+                            {{ ($convertedWalkin + $convertedAdmission) }}
+                        </a>
                     </p>
                     <p class="mt-1 text-xs text-slate-500">
                         {{ __('Walk-ins:') }} <span class="font-semibold text-slate-700">{{ $convertedWalkin }}</span>
@@ -154,18 +257,18 @@
             </div>
 
             {{-- Calls summary (all time + optional range) --}}
-            <div class="bg-white rounded-2xl shadow-lg shadow-blue-100/50 border border-blue-100 p-5">
-                <div class="flex items-center justify-between mb-4">
+            <div class="bg-sky-50 rounded-2xl shadow-lg shadow-sky-100/60 border border-sky-200 p-5">
+                <div class="flex items-center justify-between mb-5 rounded-xl bg-sky-100/70 border border-sky-200/70 px-4 py-3">
                     <div class="flex items-center gap-2">
-                        <span class="flex h-8 w-1 rounded-full bg-blue-500"></span>
-                        <p class="text-sm font-semibold text-blue-900">{{ __('Call activity summary') }}</p>
+                        <span class="flex h-8 w-1 rounded-full bg-sky-600"></span>
+                        <p class="text-sm font-semibold text-sky-900">{{ __('Call activity summary') }}</p>
                     </div>
                     <a href="{{ route('calls.report', ['staff_id' => $staff->id]) }}"
-                       class="text-xs font-semibold text-blue-600 hover:text-blue-800">
+                       class="text-xs font-semibold text-sky-700 hover:text-sky-900">
                         {{ __('Open full call report') }} →
                     </a>
                 </div>
-                <p class="text-xs font-medium text-blue-700 mb-3">{{ __('Total calls till now (all time)') }}</p>
+                <p class="text-xs font-medium text-sky-800 mb-3">{{ __('Total calls till now (all time)') }}</p>
                 <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
                     <div class="bg-slate-50 rounded-xl p-3 border border-slate-100">
                         <p class="text-xs text-slate-500">{{ __('Total calls') }}</p>
@@ -187,7 +290,7 @@
                     </div>
                 </div>
                 @if (isset($callsSummaryFiltered))
-                    <p class="text-xs font-medium text-blue-700 mt-4 mb-2">{{ __('In selected date range') }}</p>
+                    <p class="text-xs font-medium text-sky-800 mt-4 mb-2">{{ __('In selected date range') }}</p>
                     <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
                         <div class="bg-blue-50/50 rounded-xl p-3 border border-blue-100">
                             <p class="text-xs text-slate-500">{{ __('Total calls') }}</p>
@@ -205,11 +308,124 @@
                 @endif
             </div>
 
+            {{-- Pending + New vs Follow-up reporting (telecaller-first) --}}
+            <div class="bg-indigo-50 rounded-2xl shadow-lg shadow-indigo-100/60 border border-indigo-200 p-5">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="flex items-center gap-2">
+                        <span class="flex h-8 w-1 rounded-full bg-indigo-600"></span>
+                        <p class="text-sm font-semibold text-indigo-900">{{ __('Call reporting (New vs Follow-up)') }}</p>
+                    </div>
+                    <a href="{{ route('calls.report', ['staff_id' => $staff->id]) }}"
+                       class="text-xs font-semibold text-indigo-700 hover:text-indigo-900">
+                        {{ __('Open call report') }} →
+                    </a>
+                </div>
+
+                @php
+                    $rangeLabel = ($filterFrom ?? '') && ($filterTo ?? '')
+                        ? ($filterFrom . ' to ' . $filterTo)
+                        : __('Last 30 days');
+                    $dailyCapNote = __('(daily table shows up to 14 days for speed)');
+                @endphp
+
+                <div class="mb-4 rounded-xl bg-indigo-100/60 border border-indigo-200 p-3 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                    <div>
+                        <p class="text-xs font-semibold text-indigo-900">{{ __('Date range (New vs Follow-up)') }}</p>
+                        <p class="mt-1 text-[11px] text-indigo-900/70">
+                            {{ __('Using range:') }} <span class="font-semibold">{{ $rangeLabel }}</span>
+                        </p>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-white text-indigo-700 border border-indigo-200">
+                            {{ __('Pending uses today queue') }}
+                        </span>
+                    </div>
+                </div>
+
+                <div class="mt-2 mb-3 rounded-xl border border-indigo-200 bg-indigo-100/50 p-3 flex items-start gap-2">
+                    <span class="flex h-8 w-2 rounded-lg bg-indigo-600"></span>
+                    <div>
+                        <p class="text-sm font-semibold text-indigo-900">{{ __('Pending calls (today queue)') }}</p>
+                        <p class="text-xs text-indigo-900/60">{{ __('Queue + due/overdue follow-ups (not historical range).') }}</p>
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm mb-4">
+                    <div class="bg-white rounded-xl p-3 border border-indigo-100">
+                        <p class="text-xs text-slate-500">{{ __('Pending calls (today queue + due/overdue)') }}</p>
+                        <p class="mt-1 text-xl font-bold text-slate-800">{{ (int) ($pendingCalls['pending_total'] ?? 0) }}</p>
+                    </div>
+                    <div class="bg-emerald-50 rounded-xl p-3 border border-emerald-100">
+                        <p class="text-xs text-emerald-700">{{ __('Pending: New (never called)') }}</p>
+                        <p class="mt-1 text-xl font-bold text-emerald-700">{{ (int) ($pendingCalls['pending_new'] ?? 0) }}</p>
+                    </div>
+                    <div class="bg-amber-50 rounded-xl p-3 border border-amber-100">
+                        <p class="text-xs text-amber-700">{{ __('Pending: Follow-up') }}</p>
+                        <p class="mt-1 text-xl font-bold text-amber-700">{{ (int) ($pendingCalls['pending_followup'] ?? 0) }}</p>
+                    </div>
+                </div>
+
+                <div class="mt-2 mb-3 rounded-xl border border-amber-200 bg-amber-100/50 p-3 flex items-center gap-2">
+                    <span class="flex h-8 w-2 rounded-lg bg-amber-500"></span>
+                    <p class="text-sm font-semibold text-amber-900">
+                        {{ __('Calls made (range):') }} <span class="font-normal">{{ $rangeLabel }}</span>
+                    </p>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm mb-4">
+                    <div class="bg-indigo-50 rounded-xl p-3 border border-indigo-100">
+                        <p class="text-xs text-indigo-700">{{ __('New calls in this range') }}</p>
+                        <p class="mt-1 text-xl font-bold text-indigo-700">{{ (int) ($callsRangeTotals['new_calls'] ?? 0) }}</p>
+                    </div>
+                    <div class="bg-amber-50 rounded-xl p-3 border border-amber-100">
+                        <p class="text-xs text-amber-700">{{ __('Follow-up calls in this range') }}</p>
+                        <p class="mt-1 text-xl font-bold text-amber-700">{{ (int) ($callsRangeTotals['followup_calls'] ?? 0) }}</p>
+                    </div>
+                    <div class="bg-slate-50 rounded-xl p-3 border border-slate-100">
+                        <p class="text-xs text-slate-500">{{ __('Total calls in this range') }}</p>
+                        <p class="mt-1 text-xl font-bold text-slate-800">{{ (int) ($callsRangeTotals['total_calls'] ?? 0) }}</p>
+                    </div>
+                </div>
+
+                <div class="mt-2 mb-3 rounded-xl border border-emerald-200 bg-emerald-100/50 p-3 flex items-center gap-2">
+                    <span class="flex h-8 w-2 rounded-lg bg-emerald-600"></span>
+                    <p class="text-sm font-semibold text-emerald-900">
+                        {{ __('Daily new vs follow-up table') }}
+                        <span class="font-normal">{{ $rangeLabel }}</span>
+                        <span class="font-normal">{{ $dailyCapNote }}</span>
+                    </p>
+                </div>
+                <div class="overflow-x-auto rounded-xl border border-indigo-100 overflow-hidden">
+                    <table class="min-w-full divide-y divide-blue-100 text-sm">
+                        <thead class="bg-gradient-to-r from-blue-50 to-sky-50">
+                            <tr>
+                                <th class="px-4 py-3 text-left font-semibold text-blue-800">{{ __('Date') }}</th>
+                                <th class="px-4 py-3 text-right font-semibold text-emerald-700">{{ __('New calls') }}</th>
+                                <th class="px-4 py-3 text-right font-semibold text-amber-700">{{ __('Follow-up calls') }}</th>
+                                <th class="px-4 py-3 text-right font-semibold text-slate-700">{{ __('Total') }}</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-blue-50/80 bg-white">
+                            @forelse ($dailyNewFollowup ?? [] as $row)
+                                <tr class="hover:bg-blue-50/30 transition">
+                                    <td class="px-4 py-3 text-slate-700 font-medium">{{ \Carbon\Carbon::parse($row['date'])->format('d M Y') }}</td>
+                                    <td class="px-4 py-3 text-right font-semibold text-emerald-700">{{ (int) ($row['new_calls'] ?? 0) }}</td>
+                                    <td class="px-4 py-3 text-right font-semibold text-amber-700">{{ (int) ($row['followup_calls'] ?? 0) }}</td>
+                                    <td class="px-4 py-3 text-right font-semibold text-slate-700">{{ (int) ($row['total_calls'] ?? 0) }}</td>
+                                </tr>
+                            @empty
+                                <tr>
+                                    <td colspan="4" class="px-4 py-6 text-sm text-slate-500 text-center">{{ __('No calls found in this date range.') }}</td>
+                                </tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
             {{-- Daily breakdown --}}
-            <div class="bg-white rounded-2xl shadow-lg shadow-blue-100/50 border border-blue-100 p-5">
-                <div class="flex items-center gap-2 mb-2">
-                    <span class="flex h-8 w-1 rounded-full bg-blue-500"></span>
-                    <p class="text-sm font-semibold text-blue-900">{{ __('Daily breakdown') }}</p>
+            <div class="bg-emerald-50 rounded-2xl shadow-lg shadow-emerald-100/60 border border-emerald-200 p-5">
+                <div class="flex items-center gap-2 mb-4 rounded-xl bg-emerald-100/70 border border-emerald-200/70 px-4 py-3">
+                    <span class="flex h-8 w-1 rounded-full bg-emerald-600"></span>
+                    <p class="text-sm font-semibold text-emerald-900">{{ __('Daily breakdown') }}</p>
                 </div>
                 <p class="text-xs text-slate-500 mb-4">
                     @if (isset($filterFrom) && isset($filterTo))
@@ -251,9 +467,9 @@
                 $uncalledStudentIds = $students->filter(fn ($s) => empty($callCountsByStudent[$s->id] ?? 0))->pluck('id')->all();
                 $uncalledCountOnPage = count($uncalledStudentIds);
             @endphp
-            <div class="bg-white rounded-2xl shadow-lg shadow-blue-100/50 border border-blue-100 p-5" x-data="{ selectedIds: [], selectAll: false }">
-                <div class="flex items-center gap-2 mb-4">
-                    <span class="flex h-8 w-1 rounded-full bg-blue-500"></span>
+            <div class="bg-blue-50 rounded-2xl shadow-lg shadow-blue-100/50 border border-blue-200 p-5" x-data="{ selectedIds: [], selectAll: false }">
+                <div class="flex items-center gap-2 mb-5 rounded-xl bg-blue-100/70 border border-blue-200/70 px-4 py-3">
+                    <span class="flex h-8 w-1 rounded-full bg-blue-600"></span>
                     <div>
                         <p class="text-sm font-semibold text-blue-900">{{ __('Students under this telecaller') }}</p>
                         <p class="text-xs text-slate-500">{{ $students->total() }} {{ __('assigned') }} · {{ $totalUncalled ?? 0 }} {{ __('not called (revocable)') }}</p>
@@ -278,7 +494,7 @@
                             <span x-text="selectAll ? '{{ __('Deselect all') }}' : '{{ __('Select all uncalled (all pages)') }}'"></span>
                         </button>
                     @endif
-                    @if (($totalUncalled ?? 0) > 0 && request('school_id') && request('class_section_id'))
+                    @if (($totalUncalled ?? 0) > 0 && $selectedSchoolId > 0 && $selectedClassSectionId > 0)
                         <form method="POST" action="{{ route('admin.staff.revoke-students', $staff) }}"
                               onsubmit="return confirm('{{ __('Revoke ALL uncalled students for this School/Class (all pages)? This cannot be undone.') }}')">
                             @csrf
@@ -286,11 +502,11 @@
                             @if ($filterLeadStatus)
                                 <input type="hidden" name="lead_status" value="{{ $filterLeadStatus }}">
                             @endif
-                            @if (request('school_id'))
-                                <input type="hidden" name="school_id" value="{{ request('school_id') }}">
+                            @if ($selectedSchoolId > 0)
+                                <input type="hidden" name="school_id" value="{{ $selectedSchoolId }}">
                             @endif
-                            @if (request('class_section_id'))
-                                <input type="hidden" name="class_section_id" value="{{ request('class_section_id') }}">
+                            @if ($selectedClassSectionId > 0)
+                                <input type="hidden" name="class_section_id" value="{{ $selectedClassSectionId }}">
                             @endif
                             <button type="submit"
                                     class="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-rose-600 hover:bg-rose-700 transition">
@@ -385,10 +601,10 @@
 
             {{-- Recent calls and campaigns --}}
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
-                <div class="bg-white rounded-2xl shadow-lg shadow-blue-100/50 border border-blue-100 p-5">
-                    <div class="flex items-center gap-2 mb-4">
-                        <span class="flex h-8 w-1 rounded-full bg-blue-500"></span>
-                        <p class="text-sm font-semibold text-blue-900">{{ __('Recent calls') }}</p>
+                <div class="bg-sky-50 rounded-2xl shadow-lg shadow-sky-100/60 border border-sky-200 p-5">
+                    <div class="flex items-center gap-2 mb-5 rounded-xl bg-sky-100/70 border border-sky-200/70 px-4 py-3">
+                        <span class="flex h-8 w-1 rounded-full bg-sky-600"></span>
+                        <p class="text-sm font-semibold text-sky-900">{{ __('Recent calls') }}</p>
                     </div>
                     <div class="overflow-x-auto rounded-xl border border-blue-100 overflow-hidden">
                         <table class="min-w-full divide-y divide-blue-100 text-sm">
@@ -439,10 +655,10 @@
                     @endif
                 </div>
 
-                <div class="bg-white rounded-2xl shadow-lg shadow-blue-100/50 border border-blue-100 p-5">
-                    <div class="flex items-center gap-2 mb-4">
-                        <span class="flex h-8 w-1 rounded-full bg-blue-500"></span>
-                        <p class="text-sm font-semibold text-blue-900">{{ __('Campaigns shot by this telecaller') }}</p>
+                <div class="bg-indigo-50 rounded-2xl shadow-lg shadow-indigo-100/60 border border-indigo-200 p-5">
+                    <div class="flex items-center gap-2 mb-5 rounded-xl bg-indigo-100/70 border border-indigo-200/70 px-4 py-3">
+                        <span class="flex h-8 w-1 rounded-full bg-indigo-600"></span>
+                        <p class="text-sm font-semibold text-indigo-900">{{ __('Campaigns shot by this telecaller') }}</p>
                     </div>
                     <div class="overflow-x-auto rounded-xl border border-blue-100 overflow-hidden">
                         <table class="min-w-full divide-y divide-blue-100 text-sm">

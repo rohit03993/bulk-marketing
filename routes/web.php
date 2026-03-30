@@ -350,6 +350,50 @@ Route::middleware(['auth', 'verified'])->group(function () {
         $stats['score_today'] = $scoreToday;
         $stats['score_overall'] = $scoreOverall;
 
+        // Call reporting (New vs Follow-up) + pending counts for this telecaller.
+        // Keep it lightweight by showing only last 14 days in the daily table.
+        $reportSessionId = (int) (
+            \App\Models\AcademicSession::where('name', '2025-26')->value('id')
+            ?? \App\Models\AcademicSession::where('is_current', true)->value('id')
+            ?? \App\Models\AcademicSession::orderByDesc('starts_at')->value('id')
+            ?? 0
+        );
+        $reportService = new \App\Services\TelecallerCallReportingService();
+
+        $pendingCalls = $reportService->pendingCallsCounts([$userId], (int) $reportSessionId, $now)[$userId] ?? [
+            'pending_total' => 0,
+            'pending_new' => 0,
+            'pending_followup' => 0,
+        ];
+
+        $rangeEnd = $now->copy()->endOfDay();
+        $maxDays = 14;
+        $rangeStart = $rangeEnd->copy()->subDays($maxDays - 1)->startOfDay();
+
+        $dailySplit = $reportService->dailyCallsSplit([$userId], (int) $reportSessionId, $rangeStart, $rangeEnd);
+
+        $dailyNewFollowup = [];
+        $callsRangeTotals = ['new_calls' => 0, 'followup_calls' => 0, 'total_calls' => 0];
+        foreach ($dailySplit as $date => $byTelecaller) {
+            $c = $byTelecaller[$userId] ?? ['new_calls' => 0, 'followup_calls' => 0, 'total_calls' => 0];
+            $c['new_calls'] = (int) ($c['new_calls'] ?? 0);
+            $c['followup_calls'] = (int) ($c['followup_calls'] ?? 0);
+            $c['total_calls'] = (int) ($c['total_calls'] ?? 0);
+            $dailyNewFollowup[] = [
+                'date' => $date,
+                'new_calls' => $c['new_calls'],
+                'followup_calls' => $c['followup_calls'],
+                'total_calls' => $c['total_calls'],
+            ];
+            $callsRangeTotals['new_calls'] += $c['new_calls'];
+            $callsRangeTotals['followup_calls'] += $c['followup_calls'];
+            $callsRangeTotals['total_calls'] += $c['total_calls'];
+        }
+        usort($dailyNewFollowup, fn ($a, $b) => strcmp($b['date'], $a['date']));
+
+        $rangeLabel = $rangeStart->toDateString() . ' to ' . $rangeEnd->toDateString();
+        $dailyCapNote = __('(daily table shows up to 14 days for speed)');
+
         $recentCampaignsList = \App\Models\Campaign::with(['school', 'template'])
             ->where('shot_by', $userId)
             ->orderByDesc('updated_at')
@@ -374,7 +418,17 @@ Route::middleware(['auth', 'verified'])->group(function () {
         $mode = 'telecaller';
         $schools = collect();
 
-        return view('dashboard', compact('stats', 'schools', 'recentCampaigns', 'mode'));
+        return view('dashboard', compact(
+            'stats',
+            'schools',
+            'recentCampaigns',
+            'mode',
+            'pendingCalls',
+            'dailyNewFollowup',
+            'callsRangeTotals',
+            'rangeLabel',
+            'dailyCapNote'
+        ));
     })->name('dashboard');
 
     Route::middleware('access:schools')->group(function () {
@@ -573,6 +627,65 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
             $firstTelecallerId = $telecallerAggs->first()->telecaller_id ?? 0;
 
+            // Call reporting dataset (read-only).
+            // Pending calls are calculated as: today call queue + due/overdue follow-ups (B).
+            // Daily calls are grouped by called_at date in IST and split: first call = new, rest = follow-up (A).
+            $callsFromStr = trim((string) request('calls_from', ''));
+            $callsToStr = trim((string) request('calls_to', ''));
+            $callsDayStr = trim((string) request('calls_day', ''));
+
+            // Keep it lightweight in UI (still read-only). Cap to 14 days.
+            $maxDays = 14;
+            $callsFrom = $callsFromStr
+                ? \Carbon\Carbon::parse($callsFromStr, 'Asia/Kolkata')->startOfDay()
+                : now()->copy()->subDays(6)->startOfDay();
+            $callsTo = $callsToStr
+                ? \Carbon\Carbon::parse($callsToStr, 'Asia/Kolkata')->endOfDay()
+                : now()->copy()->endOfDay();
+
+            if ($callsFrom->gt($callsTo)) {
+                $callsFrom = $callsTo->copy()->subDays(6)->startOfDay();
+            }
+
+            $daysCount = $callsFrom->diffInDays($callsTo) + 1;
+            if ($daysCount > $maxDays) {
+                $callsTo = $callsFrom->copy()->addDays($maxDays - 1)->endOfDay();
+            }
+
+            $callsDays = [];
+            $cursor = $callsFrom->copy()->startOfDay();
+            while ($cursor->lte($callsTo)) {
+                $callsDays[] = $cursor->toDateString();
+                $cursor->addDay();
+            }
+
+            $callsToDateStr = $callsTo->copy()->toDateString();
+            $selectedDay = $callsDayStr && in_array($callsDayStr, $callsDays, true)
+                ? $callsDayStr
+                : $callsToDateStr;
+
+            $telecallerIds = $telecallerAggs->pluck('telecaller_id')->map(fn ($id) => (int) $id)->values()->all();
+
+            $reportService = new \App\Services\TelecallerCallReportingService();
+            $pendingByTelecaller = $reportService->pendingCallsCounts($telecallerIds, $sessionId, now());
+            $dailyCallsByTelecallerDate = $reportService->dailyCallsSplit($telecallerIds, $sessionId, $callsFrom, $callsTo);
+
+            $callsDailySelected = $dailyCallsByTelecallerDate[$selectedDay] ?? [];
+
+            // Range totals across the whole from/to period.
+            $callsRangeTotals = [];
+            foreach ($telecallerIds as $tid) {
+                $callsRangeTotals[$tid] = ['new_calls' => 0, 'followup_calls' => 0, 'total_calls' => 0];
+            }
+            foreach ($dailyCallsByTelecallerDate as $day => $byTelecaller) {
+                foreach ($byTelecaller as $tid => $counts) {
+                    $tid = (int) $tid;
+                    $callsRangeTotals[$tid]['new_calls'] += (int) ($counts['new_calls'] ?? 0);
+                    $callsRangeTotals[$tid]['followup_calls'] += (int) ($counts['followup_calls'] ?? 0);
+                    $callsRangeTotals[$tid]['total_calls'] += (int) ($counts['total_calls'] ?? 0);
+                }
+            }
+
             $kpi = [
                 'total_students' => (int) $schoolAggs->sum('total_students'),
                 'converted' => (int) $schoolAggs->sum('converted_count'),
@@ -591,6 +704,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
                 'schoolBreakdown' => $schoolBreakdown,
                 'telecallerAggs' => $telecallerAggs,
                 'firstTelecallerId' => $firstTelecallerId,
+                'callsFrom' => $callsFrom->toDateString(),
+                'callsTo' => $callsTo->toDateString(),
+                'callsDays' => $callsDays,
+                'callsSelectedDay' => $selectedDay,
+                'pendingByTelecaller' => $pendingByTelecaller,
+                'callsDailySelected' => $callsDailySelected,
+                'callsRangeTotals' => $callsRangeTotals,
             ]);
         })->name('dashboard');
     });

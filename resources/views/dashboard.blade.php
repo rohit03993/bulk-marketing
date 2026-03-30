@@ -26,6 +26,12 @@
                 </div>
 
                 {{-- KPI cards (reporting) --}}
+                @php
+                    $dashboardSessionId = (int) (
+                        \App\Models\AcademicSession::where('name', $currentSessionName ?? '2025-26')->value('id')
+                        ?? 0
+                    );
+                @endphp
                 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
                     <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
                         <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide">{{ __('Total students') }}</p>
@@ -33,7 +39,11 @@
                     </div>
                     <div class="bg-white rounded-2xl border border-emerald-200 shadow-sm p-6">
                         <p class="text-xs font-semibold text-emerald-700 uppercase tracking-wide">{{ __('Converted') }}</p>
-                        <p class="mt-2 text-3xl font-extrabold text-emerald-700">{{ $kpi['converted'] ?? 0 }}</p>
+                        <p class="mt-2 text-3xl font-extrabold text-emerald-700">
+                            <a href="{{ route('students.index', ['lead_status' => 'converted', 'session_id' => $dashboardSessionId]) }}" class="hover:underline">
+                                {{ $kpi['converted'] ?? 0 }}
+                            </a>
+                        </p>
                     </div>
                     <div class="bg-white rounded-2xl border border-amber-200 shadow-sm p-6">
                         <p class="text-xs font-semibold text-amber-700 uppercase tracking-wide">{{ __('Follow-ups due') }}</p>
@@ -41,7 +51,11 @@
                     </div>
                     <div class="bg-white rounded-2xl border border-rose-200 shadow-sm p-6">
                         <p class="text-xs font-semibold text-rose-700 uppercase tracking-wide">{{ __('Blocked leads') }}</p>
-                        <p class="mt-2 text-3xl font-extrabold text-rose-700">{{ $kpi['blocked'] ?? 0 }}</p>
+                        <p class="mt-2 text-3xl font-extrabold text-rose-700">
+                            <a href="{{ route('students.index', ['blocked' => 1, 'session_id' => $dashboardSessionId]) }}" class="hover:underline">
+                                {{ $kpi['blocked'] ?? 0 }}
+                            </a>
+                        </p>
                     </div>
                 </div>
 
@@ -445,6 +459,113 @@
                             <p class="text-2xl font-bold text-emerald-600">{{ $stats['messages_sent'] ?? 0 }}</p>
                             <p class="text-[11px] text-slate-500">{{ __('Messages Sent') }}</p>
                         </div>
+                    </div>
+                </div>
+
+                {{-- Call reporting (New vs Follow-up) --}}
+                <div class="bg-indigo-50 rounded-2xl shadow-lg shadow-indigo-100/60 border border-indigo-200 p-5">
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="flex items-center gap-2">
+                            <span class="flex h-8 w-1 rounded-full bg-indigo-600"></span>
+                            <p class="text-sm font-semibold text-indigo-900">{{ __('Call reporting (New vs Follow-up)') }}</p>
+                        </div>
+                        <a href="{{ route('calls.report') }}"
+                           class="text-xs font-semibold text-indigo-700 hover:text-indigo-900">
+                            {{ __('Open call report') }} →
+                        </a>
+                    </div>
+
+                    <div class="mb-4 rounded-xl bg-indigo-100/60 border border-indigo-200 p-3 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                        <div>
+                            <p class="text-xs font-semibold text-indigo-900">{{ __('Date range (New vs Follow-up)') }}</p>
+                            <p class="mt-1 text-[11px] text-indigo-900/70">
+                                {{ __('Using range:') }} <span class="font-semibold">{{ $rangeLabel ?? '' }}</span>
+                            </p>
+                        </div>
+                        <div class="flex flex-wrap items-center gap-2">
+                            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-white text-indigo-700 border border-indigo-200">
+                                {{ __('Pending uses today queue') }}
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="mt-2 mb-3 rounded-xl border border-indigo-200 bg-indigo-100/50 p-3 flex items-start gap-2">
+                        <span class="flex h-8 w-2 rounded-lg bg-indigo-600"></span>
+                        <div>
+                            <p class="text-sm font-semibold text-indigo-900">{{ __('Pending calls (today queue)') }}</p>
+                            <p class="text-xs text-indigo-900/60">{{ __('Queue + due/overdue follow-ups for today.') }}</p>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm mt-4 mb-4">
+                        <div class="bg-white rounded-xl p-3 border border-indigo-100">
+                            <p class="text-xs text-slate-500">{{ __('Pending calls (queue)') }}</p>
+                            <p class="mt-1 text-xl font-bold text-slate-800">{{ (int) ($pendingCalls['pending_total'] ?? 0) }}</p>
+                        </div>
+                        <div class="bg-emerald-50 rounded-xl p-3 border border-emerald-100">
+                            <p class="text-xs text-emerald-700">{{ __('Pending: New (uncalled)') }}</p>
+                            <p class="mt-1 text-xl font-bold text-emerald-700">{{ (int) ($pendingCalls['pending_new'] ?? 0) }}</p>
+                        </div>
+                        <div class="bg-amber-50 rounded-xl p-3 border border-amber-100">
+                            <p class="text-xs text-amber-700">{{ __('Pending: Follow-up') }}</p>
+                            <p class="mt-1 text-xl font-bold text-amber-700">{{ (int) ($pendingCalls['pending_followup'] ?? 0) }}</p>
+                        </div>
+                    </div>
+
+                    <div class="mt-2 mb-3 rounded-xl border border-amber-200 bg-amber-100/50 p-3 flex items-center justify-between gap-3">
+                        <p class="text-sm font-semibold text-amber-900">
+                            {{ __('Calls made (range):') }} <span class="font-normal">{{ $rangeLabel ?? '' }}</span>
+                        </p>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm mb-4">
+                        <div class="bg-indigo-50 rounded-xl p-3 border border-indigo-100">
+                            <p class="text-xs text-indigo-700">{{ __('New calls in this range') }}</p>
+                            <p class="mt-1 text-xl font-bold text-indigo-700">{{ (int) ($callsRangeTotals['new_calls'] ?? 0) }}</p>
+                        </div>
+                        <div class="bg-amber-50 rounded-xl p-3 border border-amber-100">
+                            <p class="text-xs text-amber-700">{{ __('Follow-up calls in this range') }}</p>
+                            <p class="mt-1 text-xl font-bold text-amber-700">{{ (int) ($callsRangeTotals['followup_calls'] ?? 0) }}</p>
+                        </div>
+                        <div class="bg-slate-50 rounded-xl p-3 border border-slate-100">
+                            <p class="text-xs text-slate-500">{{ __('Total calls in this range') }}</p>
+                            <p class="mt-1 text-xl font-bold text-slate-800">{{ (int) ($callsRangeTotals['total_calls'] ?? 0) }}</p>
+                        </div>
+                    </div>
+
+                    <div class="mt-2 mb-3 rounded-xl border border-emerald-200 bg-emerald-100/50 p-3 flex items-center gap-2">
+                        <span class="flex h-8 w-2 rounded-lg bg-emerald-600"></span>
+                        <p class="text-sm font-semibold text-emerald-900">
+                            {{ __('Daily new vs follow-up table') }}
+                            <span class="font-normal">{{ $dailyCapNote ?? '' }}</span>
+                        </p>
+                    </div>
+
+                    <div class="overflow-x-auto rounded-xl border border-indigo-100 overflow-hidden">
+                        <table class="min-w-full divide-y divide-blue-100 text-sm">
+                            <thead class="bg-gradient-to-r from-blue-50 to-sky-50">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold text-blue-800">{{ __('Date') }}</th>
+                                    <th class="px-4 py-3 text-right font-semibold text-emerald-700">{{ __('New calls') }}</th>
+                                    <th class="px-4 py-3 text-right font-semibold text-amber-700">{{ __('Follow-up calls') }}</th>
+                                    <th class="px-4 py-3 text-right font-semibold text-slate-700">{{ __('Total') }}</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-blue-50/80 bg-white">
+                                @forelse ($dailyNewFollowup ?? [] as $row)
+                                    <tr class="hover:bg-blue-50/30 transition">
+                                        <td class="px-4 py-3 text-slate-700 font-medium">{{ \Carbon\Carbon::parse($row['date'])->format('d M Y') }}</td>
+                                        <td class="px-4 py-3 text-right font-semibold text-emerald-700">{{ (int) ($row['new_calls'] ?? 0) }}</td>
+                                        <td class="px-4 py-3 text-right font-semibold text-amber-700">{{ (int) ($row['followup_calls'] ?? 0) }}</td>
+                                        <td class="px-4 py-3 text-right font-semibold text-slate-700">{{ (int) ($row['total_calls'] ?? 0) }}</td>
+                                    </tr>
+                                @empty
+                                    <tr>
+                                        <td colspan="4" class="px-4 py-6 text-sm text-slate-500 text-center">{{ __('No calls found in this date range.') }}</td>
+                                    </tr>
+                                @endforelse
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             @endif
