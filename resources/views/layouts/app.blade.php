@@ -37,5 +37,58 @@
 
             @include('layouts.bottom-nav')
         </div>
+        <script>
+            // Global school select search helper:
+            // adds a 3+ character search input above every school_id dropdown.
+            (function () {
+                const selects = document.querySelectorAll('select[name="school_id"]');
+                if (!selects.length) return;
+
+                selects.forEach(function (selectEl) {
+                    if (!selectEl || selectEl.dataset.schoolSearchEnhanced === '1') return;
+                    selectEl.dataset.schoolSearchEnhanced = '1';
+
+                    const options = Array.from(selectEl.options).map(function (opt) {
+                        return { value: opt.value, text: opt.text };
+                    });
+
+                    const searchEl = document.createElement('input');
+                    searchEl.type = 'text';
+                    searchEl.placeholder = 'Type 3+ letters to search school';
+                    searchEl.className = 'mt-1 mb-1 block w-full rounded-md border-gray-300 text-sm';
+                    const hintEl = document.createElement('p');
+                    hintEl.className = 'mt-1 text-[11px] text-slate-500';
+                    hintEl.textContent = 'Type 3+ characters to filter schools';
+
+                    const wrapper = document.createElement('div');
+                    wrapper.className = 'school-search-enhancer';
+                    selectEl.parentNode.insertBefore(wrapper, selectEl);
+                    wrapper.appendChild(searchEl);
+                    wrapper.appendChild(hintEl);
+                    wrapper.appendChild(selectEl);
+
+                    const render = function (q) {
+                        const term = (q || '').trim().toLowerCase();
+                        const useFilter = term.length >= 3;
+                        const selectedValue = selectEl.value;
+                        selectEl.innerHTML = '';
+
+                        options.forEach(function (opt) {
+                            if (!useFilter || opt.text.toLowerCase().includes(term) || opt.value === '') {
+                                const o = document.createElement('option');
+                                o.value = opt.value;
+                                o.text = opt.text;
+                                if (opt.value === selectedValue) o.selected = true;
+                                selectEl.appendChild(o);
+                            }
+                        });
+                    };
+
+                    searchEl.addEventListener('input', function () {
+                        render(searchEl.value);
+                    });
+                });
+            })();
+        </script>
     </body>
 </html>
