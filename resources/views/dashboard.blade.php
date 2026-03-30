@@ -77,7 +77,7 @@
                             <form method="GET" action="{{ route('dashboard') }}" class="flex flex-col sm:flex-row sm:items-end gap-3">
                                 <div class="flex-1">
                                     <label class="text-[11px] font-semibold text-slate-600">{{ __('Select school') }}</label>
-                                    <select name="school_id"
+                                    <select name="school_id" data-school-search="1"
                                             class="mt-1 w-full rounded-lg border-slate-200 bg-white text-sm px-3 py-2 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50">
                                         <option value="0" {{ $selectedSchoolId === 0 ? 'selected' : '' }}>{{ __('All schools') }}</option>
                                         @foreach (($schoolOptions ?? collect()) as $opt)

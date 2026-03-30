@@ -38,55 +38,105 @@
             @include('layouts.bottom-nav')
         </div>
         <script>
-            // Global school select search helper:
-            // adds a 3+ character search input above every school_id dropdown.
+            // Global school combobox helper (single-box search + dropdown suggestions).
+            // Only applies where select has: data-school-search="1"
             (function () {
-                const selects = document.querySelectorAll('select[name="school_id"]');
+                const selects = document.querySelectorAll('select[name="school_id"][data-school-search="1"]');
                 if (!selects.length) return;
 
-                selects.forEach(function (selectEl) {
+                selects.forEach(function (selectEl, idx) {
                     if (!selectEl || selectEl.dataset.schoolSearchEnhanced === '1') return;
                     selectEl.dataset.schoolSearchEnhanced = '1';
 
                     const options = Array.from(selectEl.options).map(function (opt) {
-                        return { value: opt.value, text: opt.text };
+                        return { value: String(opt.value ?? ''), text: String(opt.text ?? '') };
                     });
+                    const selected = options.find(function (o) { return o.value === String(selectEl.value ?? ''); }) || { value: '', text: '' };
 
-                    const searchEl = document.createElement('input');
-                    searchEl.type = 'text';
-                    searchEl.placeholder = 'Type 3+ letters to search school';
-                    searchEl.className = 'mt-1 mb-1 block w-full rounded-md border-gray-300 text-sm';
+                    const wrapper = document.createElement('div');
+                    wrapper.className = 'school-combobox';
+
+                    const inputEl = document.createElement('input');
+                    inputEl.type = 'text';
+                    inputEl.placeholder = 'Search or select school';
+                    inputEl.className = 'mt-1 block w-full rounded-md border-gray-300 text-sm';
+
+                    const datalistId = 'school_search_list_' + idx + '_' + Math.floor(Math.random() * 100000);
+                    inputEl.setAttribute('list', datalistId);
+
+                    const listEl = document.createElement('datalist');
+                    listEl.id = datalistId;
+
+                    const hiddenEl = document.createElement('input');
+                    hiddenEl.type = 'hidden';
+                    hiddenEl.name = 'school_id';
+                    hiddenEl.value = selected.value || '';
+
                     const hintEl = document.createElement('p');
                     hintEl.className = 'mt-1 text-[11px] text-slate-500';
                     hintEl.textContent = 'Type 3+ characters to filter schools';
 
-                    const wrapper = document.createElement('div');
-                    wrapper.className = 'school-search-enhancer';
-                    selectEl.parentNode.insertBefore(wrapper, selectEl);
-                    wrapper.appendChild(searchEl);
-                    wrapper.appendChild(hintEl);
-                    wrapper.appendChild(selectEl);
+                    options.forEach(function (opt) {
+                        if (opt.value === '') return;
+                        const o = document.createElement('option');
+                        o.value = opt.text;
+                        listEl.appendChild(o);
+                    });
 
-                    const render = function (q) {
-                        const term = (q || '').trim().toLowerCase();
-                        const useFilter = term.length >= 3;
-                        const selectedValue = selectEl.value;
-                        selectEl.innerHTML = '';
+                    inputEl.value = selected.value === '' ? '' : (selected.text || '');
 
-                        options.forEach(function (opt) {
-                            if (!useFilter || opt.text.toLowerCase().includes(term) || opt.value === '') {
-                                const o = document.createElement('option');
-                                o.value = opt.value;
-                                o.text = opt.text;
-                                if (opt.value === selectedValue) o.selected = true;
-                                selectEl.appendChild(o);
-                            }
-                        });
+                    const findExact = function (text) {
+                        const t = (text || '').trim().toLowerCase();
+                        return options.find(function (o) {
+                            return o.value !== '' && o.text.trim().toLowerCase() === t;
+                        }) || null;
                     };
 
-                    searchEl.addEventListener('input', function () {
-                        render(searchEl.value);
+                    const findContains = function (text) {
+                        const t = (text || '').trim().toLowerCase();
+                        if (t.length < 3) return null;
+                        return options.find(function (o) {
+                            return o.value !== '' && o.text.toLowerCase().includes(t);
+                        }) || null;
+                    };
+
+                    const syncValue = function () {
+                        const raw = inputEl.value || '';
+                        if (raw.trim() === '') {
+                            hiddenEl.value = '';
+                            hintEl.textContent = 'Type 3+ characters to filter schools';
+                            return;
+                        }
+                        const exact = findExact(raw);
+                        if (exact) {
+                            hiddenEl.value = exact.value;
+                            hintEl.textContent = 'School selected';
+                            return;
+                        }
+                        hiddenEl.value = '';
+                        hintEl.textContent = raw.trim().length >= 3
+                            ? 'Select a school from suggestions'
+                            : 'Type 3+ characters to filter schools';
+                    };
+
+                    inputEl.addEventListener('input', syncValue);
+                    inputEl.addEventListener('change', syncValue);
+                    inputEl.addEventListener('blur', function () {
+                        if (hiddenEl.value) return;
+                        const partial = findContains(inputEl.value || '');
+                        if (partial) {
+                            inputEl.value = partial.text;
+                            hiddenEl.value = partial.value;
+                            hintEl.textContent = 'School selected';
+                        }
                     });
+
+                    selectEl.parentNode.insertBefore(wrapper, selectEl);
+                    wrapper.appendChild(inputEl);
+                    wrapper.appendChild(listEl);
+                    wrapper.appendChild(hiddenEl);
+                    wrapper.appendChild(hintEl);
+                    selectEl.remove();
                 });
             })();
         </script>

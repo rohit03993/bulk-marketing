@@ -18,7 +18,7 @@
                             <label class="block text-xs font-medium text-gray-500">{{ __('School') }}</label>
                             <a href="{{ route('schools.create') }}" class="text-xs text-indigo-600 hover:text-indigo-800">{{ __('Add school') }}</a>
                         </div>
-                        <select name="school_id" class="mt-1 rounded-md border-gray-300 text-sm" onchange="this.form.submit()">
+                        <select name="school_id" data-school-search="1" class="mt-1 rounded-md border-gray-300 text-sm" onchange="this.form.submit()">
                             <option value="">{{ __('Select') }}</option>
                             @foreach ($schools as $s)
                                 <option value="{{ $s->id }}" {{ ($schoolId ?? '') == $s->id ? 'selected' : '' }}>{{ $s->name }}</option>

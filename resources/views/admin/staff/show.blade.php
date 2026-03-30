@@ -115,7 +115,7 @@
                     </div>
                     <div>
                         <label for="school_id" class="block text-xs font-medium text-blue-700">{{ __('School') }}</label>
-                        <select id="school_id" name="school_id" class="mt-1 block w-full rounded-lg border-blue-200 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500 text-slate-700">
+                        <select id="school_id" name="school_id" data-school-search="1" class="mt-1 block w-full rounded-lg border-blue-200 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500 text-slate-700">
                             <option value="">{{ __('All') }}</option>
                             @foreach ($schools as $school)
                                 <option value="{{ $school->id }}" {{ $selectedSchoolId === (int) $school->id ? 'selected' : '' }}>

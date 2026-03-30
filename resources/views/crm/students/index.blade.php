@@ -48,7 +48,7 @@
                 <div class="flex flex-wrap gap-2 items-end">
                     <div class="min-w-[120px]">
                         <label class="block text-xs font-medium text-gray-500">{{ __('School') }}</label>
-                        <select name="school_id" class="mt-1 block w-full rounded-md border-gray-300 text-sm">
+                        <select name="school_id" data-school-search="1" class="mt-1 block w-full rounded-md border-gray-300 text-sm">
                             <option value="">{{ __('All') }}</option>
                             @foreach ($schools as $s)
                                 <option value="{{ $s->id }}" {{ request('school_id') == $s->id ? 'selected' : '' }}>{{ $s->name }}</option>
