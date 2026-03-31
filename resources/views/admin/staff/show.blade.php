@@ -507,7 +507,7 @@
                 $uncalledStudentIds = $students->filter(fn ($s) => empty($callCountsByStudent[$s->id] ?? 0))->pluck('id')->all();
                 $uncalledCountOnPage = count($uncalledStudentIds);
             @endphp
-            <div class="bg-blue-50 rounded-2xl shadow-lg shadow-blue-100/50 border border-blue-200 p-5" x-data="{ selectedIds: [], selectAll: false }">
+            <div id="students-section" class="bg-blue-50 rounded-2xl shadow-lg shadow-blue-100/50 border border-blue-200 p-5 scroll-mt-24" x-data="{ selectedIds: [], selectAll: false }">
                 <div class="flex items-center gap-2 mb-5 rounded-xl bg-blue-100/70 border border-blue-200/70 px-4 py-3">
                     <span class="flex h-8 w-1 rounded-full bg-blue-600"></span>
                     <div>
@@ -575,6 +575,10 @@
                                 {{ __('Revoke latest (school)') }}
                             </button>
                         </form>
+                    @elseif (($totalUncalled ?? 0) > 0)
+                        <span class="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-medium text-orange-700 bg-orange-50 border border-orange-200">
+                            {{ __('Select a School filter to enable "Revoke latest".') }}
+                        </span>
                     @endif
                 </div>
                 <div class="overflow-x-auto rounded-xl border border-blue-100 overflow-hidden">
@@ -656,14 +660,14 @@
                         <p class="text-slate-600">
                             {{ __('Showing') }} <span class="font-semibold">{{ $students->firstItem() ?? 0 }}</span> {{ __('to') }} <span class="font-semibold">{{ $students->lastItem() ?? 0 }}</span> {{ __('of') }} <span class="font-semibold">{{ $students->total() }}</span> {{ __('students') }}
                         </p>
-                        <div>{{ $students->links() }}</div>
+                        <div>{{ $students->fragment('students-section')->links() }}</div>
                     </div>
                 @endif
             </div>
 
             {{-- Recent calls and campaigns --}}
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
-                <div class="bg-sky-50 rounded-2xl shadow-lg shadow-sky-100/60 border border-sky-200 p-5">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-5 items-start">
+                <div id="recent-calls-section" class="bg-sky-50 rounded-2xl shadow-lg shadow-sky-100/60 border border-sky-200 p-5 scroll-mt-24">
                     <div class="flex items-center gap-2 mb-5 rounded-xl bg-sky-100/70 border border-sky-200/70 px-4 py-3">
                         <span class="flex h-8 w-1 rounded-full bg-sky-600"></span>
                         <p class="text-sm font-semibold text-sky-900">{{ __('Recent calls') }}</p>
@@ -712,12 +716,12 @@
                             <p class="text-slate-600">
                                 {{ __('Showing') }} <span class="font-semibold">{{ $recentCalls->firstItem() ?? 0 }}</span> {{ __('to') }} <span class="font-semibold">{{ $recentCalls->lastItem() ?? 0 }}</span> {{ __('of') }} <span class="font-semibold">{{ $recentCalls->total() }}</span> {{ __('calls') }}
                             </p>
-                            <div>{{ $recentCalls->links() }}</div>
+                            <div>{{ $recentCalls->fragment('recent-calls-section')->links() }}</div>
                         </div>
                     @endif
                 </div>
 
-                <div class="bg-indigo-50 rounded-2xl shadow-lg shadow-indigo-100/60 border border-indigo-200 p-5">
+                <div id="campaigns-section" class="bg-indigo-50 rounded-2xl shadow-lg shadow-indigo-100/60 border border-indigo-200 p-5 scroll-mt-24">
                     <div class="flex items-center gap-2 mb-5 rounded-xl bg-indigo-100/70 border border-indigo-200/70 px-4 py-3">
                         <span class="flex h-8 w-1 rounded-full bg-indigo-600"></span>
                         <p class="text-sm font-semibold text-indigo-900">{{ __('Campaigns shot by this telecaller') }}</p>
@@ -762,12 +766,28 @@
                             <p class="text-slate-600">
                                 {{ __('Showing') }} <span class="font-semibold">{{ $campaigns->firstItem() ?? 0 }}</span> {{ __('to') }} <span class="font-semibold">{{ $campaigns->lastItem() ?? 0 }}</span> {{ __('of') }} <span class="font-semibold">{{ $campaigns->total() }}</span> {{ __('campaigns') }}
                             </p>
-                            <div>{{ $campaigns->links() }}</div>
+                            <div>{{ $campaigns->fragment('campaigns-section')->links() }}</div>
                         </div>
                     @endif
                 </div>
             </div>
         </div>
     </div>
+    <script>
+        (function () {
+            const params = new URLSearchParams(window.location.search);
+            let targetId = '';
+            if (params.has('students_page')) targetId = 'students-section';
+            else if (params.has('calls_page')) targetId = 'recent-calls-section';
+            else if (params.has('campaigns_page')) targetId = 'campaigns-section';
+            if (!targetId) return;
+            const el = document.getElementById(targetId);
+            if (el) {
+                setTimeout(function () {
+                    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }, 60);
+            }
+        })();
+    </script>
 </x-app-layout>
 
