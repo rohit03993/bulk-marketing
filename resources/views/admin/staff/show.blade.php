@@ -561,13 +561,14 @@
                             @csrf
                             <input type="hidden" name="revoke_latest" value="1">
                             <select name="school_id"
+                                    id="revoke_latest_school_id"
                                     class="rounded-lg border border-blue-200 text-xs px-2 py-1.5 min-w-[170px]"
                                     required
                                     title="{{ __('Select school for latest revoke') }}">
                                 <option value="">{{ __('Select school') }}</option>
                                 @foreach (($revokeSchoolOptions ?? collect()) as $school)
-                                    <option value="{{ $school->id }}" {{ $selectedSchoolId === (int) $school->id ? 'selected' : '' }}>
-                                        {{ $school->name }}
+                                    <option value="{{ $school->id }}" data-eligible-count="{{ (int) ($school->eligible_count ?? 0) }}" {{ $selectedSchoolId === (int) $school->id ? 'selected' : '' }}>
+                                        {{ $school->name }} ({{ (int) ($school->eligible_count ?? 0) }})
                                     </option>
                                 @endforeach
                             </select>
@@ -581,6 +582,9 @@
                                     class="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-orange-600 hover:bg-orange-700 transition">
                                 {{ __('Revoke latest (school)') }}
                             </button>
+                            <span id="revoke_latest_hint" class="inline-flex items-center px-2.5 py-1 rounded-md text-[11px] font-medium text-orange-700 bg-orange-50 border border-orange-200">
+                                {{ __('Select school to see eligible count') }}
+                            </span>
                         </form>
                     @endif
                 </div>
@@ -790,6 +794,26 @@
                     el.scrollIntoView({ behavior: 'smooth', block: 'start' });
                 }, 60);
             }
+        })();
+    </script>
+    <script>
+        (function () {
+            const schoolSel = document.getElementById('revoke_latest_school_id');
+            const hint = document.getElementById('revoke_latest_hint');
+            if (!schoolSel || !hint) return;
+
+            const updateHint = function () {
+                const opt = schoolSel.options[schoolSel.selectedIndex];
+                const n = Number(opt?.dataset?.eligibleCount || 0);
+                if (!schoolSel.value) {
+                    hint.textContent = 'Select school to see eligible count';
+                    return;
+                }
+                hint.textContent = 'Eligible uncalled in selected school: ' + n + ' (revoke latest 10)';
+            };
+
+            schoolSel.addEventListener('change', updateHint);
+            updateHint();
         })();
     </script>
 </x-app-layout>

@@ -248,19 +248,32 @@ class StaffController extends Controller
                 ->get();
         }
 
-        // Schools that actually have students assigned to this telecaller (optionally scoped by class filter).
+        // Schools + eligible uncalled counts for "Revoke latest (school)".
+        $revokeEligibleBySchool = Student::query()
+            ->where('assigned_to', $staff->id)
+            ->when($filterClassSectionId, fn ($q) => $q->where('class_section_id', $filterClassSectionId))
+            ->when($filterLeadStatus, function ($q) use ($filterLeadStatus) {
+                if ($filterLeadStatus === 'converted') {
+                    $q->whereIn('lead_status', ['walkin_done', 'admission_done']);
+                } else {
+                    $q->where('lead_status', $filterLeadStatus);
+                }
+            })
+            ->whereDoesntHave('calls', fn ($q) => $q->where('user_id', $staff->id))
+            ->join('class_sections', 'students.class_section_id', '=', 'class_sections.id')
+            ->selectRaw('class_sections.school_id as school_id, count(students.id) as eligible_count')
+            ->groupBy('class_sections.school_id')
+            ->pluck('eligible_count', 'school_id');
+
         $revokeSchoolOptions = School::query()
-            ->whereIn('id', ClassSection::query()
-                ->whereIn('id', Student::query()
-                    ->where('assigned_to', $staff->id)
-                    ->when($filterClassSectionId, fn ($q) => $q->where('class_section_id', $filterClassSectionId))
-                    ->select('class_section_id')
-                )
-                ->select('school_id')
-                ->distinct()
-            )
+            ->whereIn('id', $revokeEligibleBySchool->keys())
             ->orderBy('name')
-            ->get(['id', 'name']);
+            ->get(['id', 'name'])
+            ->map(function ($s) use ($revokeEligibleBySchool) {
+                $s->eligible_count = (int) ($revokeEligibleBySchool[$s->id] ?? 0);
+                return $s;
+            })
+            ->values();
 
         return view('admin.staff.show', [
             'staff' => $staff,
