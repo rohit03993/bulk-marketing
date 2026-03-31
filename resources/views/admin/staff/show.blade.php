@@ -667,7 +667,27 @@
                         <p class="text-slate-600">
                             {{ __('Showing') }} <span class="font-semibold">{{ $students->firstItem() ?? 0 }}</span> {{ __('to') }} <span class="font-semibold">{{ $students->lastItem() ?? 0 }}</span> {{ __('of') }} <span class="font-semibold">{{ $students->total() }}</span> {{ __('students') }}
                         </p>
-                        <div>{{ $students->fragment('students-section')->links() }}</div>
+                        @php
+                            $studentsPrevUrl = $students->previousPageUrl() ? $students->appends(request()->except('students_page'))->previousPageUrl() . '#students-section' : null;
+                            $studentsNextUrl = $students->nextPageUrl() ? $students->appends(request()->except('students_page'))->nextPageUrl() . '#students-section' : null;
+                        @endphp
+                        <div class="flex items-center gap-2">
+                            @if ($studentsPrevUrl)
+                                <a href="{{ $studentsPrevUrl }}" class="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold text-blue-700 bg-white border border-blue-200 hover:bg-blue-50">
+                                    {{ __('Prev') }}
+                                </a>
+                            @else
+                                <span class="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-400 bg-slate-50 border border-slate-200">{{ __('Prev') }}</span>
+                            @endif
+                            <span class="text-xs text-slate-600">{{ $students->currentPage() }}/{{ $students->lastPage() }}</span>
+                            @if ($studentsNextUrl)
+                                <a href="{{ $studentsNextUrl }}" class="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold text-blue-700 bg-white border border-blue-200 hover:bg-blue-50">
+                                    {{ __('Next') }}
+                                </a>
+                            @else
+                                <span class="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-400 bg-slate-50 border border-slate-200">{{ __('Next') }}</span>
+                            @endif
+                        </div>
                     </div>
                 @endif
             </div>
@@ -723,7 +743,27 @@
                             <p class="text-slate-600">
                                 {{ __('Showing') }} <span class="font-semibold">{{ $recentCalls->firstItem() ?? 0 }}</span> {{ __('to') }} <span class="font-semibold">{{ $recentCalls->lastItem() ?? 0 }}</span> {{ __('of') }} <span class="font-semibold">{{ $recentCalls->total() }}</span> {{ __('calls') }}
                             </p>
-                            <div>{{ $recentCalls->fragment('recent-calls-section')->links() }}</div>
+                            @php
+                                $callsPrevUrl = $recentCalls->previousPageUrl() ? $recentCalls->appends(request()->except('calls_page'))->previousPageUrl() . '#recent-calls-section' : null;
+                                $callsNextUrl = $recentCalls->nextPageUrl() ? $recentCalls->appends(request()->except('calls_page'))->nextPageUrl() . '#recent-calls-section' : null;
+                            @endphp
+                            <div class="flex items-center gap-2">
+                                @if ($callsPrevUrl)
+                                    <a href="{{ $callsPrevUrl }}" class="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold text-blue-700 bg-white border border-blue-200 hover:bg-blue-50">
+                                        {{ __('Prev') }}
+                                    </a>
+                                @else
+                                    <span class="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-400 bg-slate-50 border border-slate-200">{{ __('Prev') }}</span>
+                                @endif
+                                <span class="text-xs text-slate-600">{{ $recentCalls->currentPage() }}/{{ $recentCalls->lastPage() }}</span>
+                                @if ($callsNextUrl)
+                                    <a href="{{ $callsNextUrl }}" class="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold text-blue-700 bg-white border border-blue-200 hover:bg-blue-50">
+                                        {{ __('Next') }}
+                                    </a>
+                                @else
+                                    <span class="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-400 bg-slate-50 border border-slate-200">{{ __('Next') }}</span>
+                                @endif
+                            </div>
                         </div>
                     @endif
                 </div>
@@ -773,7 +813,27 @@
                             <p class="text-slate-600">
                                 {{ __('Showing') }} <span class="font-semibold">{{ $campaigns->firstItem() ?? 0 }}</span> {{ __('to') }} <span class="font-semibold">{{ $campaigns->lastItem() ?? 0 }}</span> {{ __('of') }} <span class="font-semibold">{{ $campaigns->total() }}</span> {{ __('campaigns') }}
                             </p>
-                            <div>{{ $campaigns->fragment('campaigns-section')->links() }}</div>
+                            @php
+                                $campaignsPrevUrl = $campaigns->previousPageUrl() ? $campaigns->appends(request()->except('campaigns_page'))->previousPageUrl() . '#campaigns-section' : null;
+                                $campaignsNextUrl = $campaigns->nextPageUrl() ? $campaigns->appends(request()->except('campaigns_page'))->nextPageUrl() . '#campaigns-section' : null;
+                            @endphp
+                            <div class="flex items-center gap-2">
+                                @if ($campaignsPrevUrl)
+                                    <a href="{{ $campaignsPrevUrl }}" class="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold text-blue-700 bg-white border border-blue-200 hover:bg-blue-50">
+                                        {{ __('Prev') }}
+                                    </a>
+                                @else
+                                    <span class="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-400 bg-slate-50 border border-slate-200">{{ __('Prev') }}</span>
+                                @endif
+                                <span class="text-xs text-slate-600">{{ $campaigns->currentPage() }}/{{ $campaigns->lastPage() }}</span>
+                                @if ($campaignsNextUrl)
+                                    <a href="{{ $campaignsNextUrl }}" class="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold text-blue-700 bg-white border border-blue-200 hover:bg-blue-50">
+                                        {{ __('Next') }}
+                                    </a>
+                                @else
+                                    <span class="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-400 bg-slate-50 border border-slate-200">{{ __('Next') }}</span>
+                                @endif
+                            </div>
                         </div>
                     @endif
                 </div>
