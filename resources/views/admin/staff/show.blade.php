@@ -554,6 +554,28 @@
                             </button>
                         </form>
                     @endif
+                    @if (($totalUncalled ?? 0) > 0 && $selectedSchoolId > 0)
+                        <form method="POST" action="{{ route('admin.staff.revoke-students', $staff) }}"
+                              class="flex items-center gap-2"
+                              onsubmit="return confirm('{{ __('Revoke latest selected uncalled students in current filter scope?') }}')">
+                            @csrf
+                            <input type="hidden" name="revoke_latest" value="1">
+                            <input type="hidden" name="school_id" value="{{ $selectedSchoolId }}">
+                            @if ($selectedClassSectionId > 0)
+                                <input type="hidden" name="class_section_id" value="{{ $selectedClassSectionId }}">
+                            @endif
+                            @if ($filterLeadStatus)
+                                <input type="hidden" name="lead_status" value="{{ $filterLeadStatus }}">
+                            @endif
+                            <input type="number" name="latest_count" min="1" max="500" value="10"
+                                   class="w-20 rounded-lg border border-blue-200 text-xs px-2 py-1.5"
+                                   title="{{ __('How many latest leads to revoke') }}">
+                            <button type="submit"
+                                    class="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-orange-600 hover:bg-orange-700 transition">
+                                {{ __('Revoke latest (school)') }}
+                            </button>
+                        </form>
+                    @endif
                 </div>
                 <div class="overflow-x-auto rounded-xl border border-blue-100 overflow-hidden">
                     <table class="min-w-full divide-y divide-blue-100 text-sm">

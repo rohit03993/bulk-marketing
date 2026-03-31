@@ -342,6 +342,8 @@ class StaffController extends Controller
             'student_ids' => 'array',
             'student_ids.*' => 'integer|exists:students,id',
             'select_all_filtered' => 'nullable|boolean',
+            'revoke_latest' => 'nullable|boolean',
+            'latest_count' => 'nullable|integer|min:1|max:500',
         ]);
 
         $revoked = 0;
@@ -366,7 +368,37 @@ class StaffController extends Controller
             $baseQuery->where('class_section_id', $request->input('class_section_id'));
         }
 
-        if ($request->boolean('select_all_filtered')) {
+        if ($request->boolean('revoke_latest')) {
+            // Safety: latest revoke requires at least school filter scope.
+            if (! $request->filled('school_id')) {
+                return redirect()->route('admin.staff.show', $staff)
+                    ->with('error', __('Please select a School before revoking latest students.'));
+            }
+
+            $latestCount = max(1, min((int) ($data['latest_count'] ?? 10), 500));
+
+            // Start from latest assignments; optional class/lead filters are already in baseQuery.
+            $candidateStudents = (clone $baseQuery)
+                ->orderByDesc('assigned_at')
+                ->orderByDesc('id')
+                ->limit($latestCount * 3) // buffer because some may have calls and be skipped
+                ->get(['id']);
+
+            $targetIds = [];
+            foreach ($candidateStudents as $s) {
+                $hasCalls = StudentCall::where('student_id', $s->id)
+                    ->where('user_id', $staff->id)
+                    ->exists();
+
+                if (! $hasCalls) {
+                    $targetIds[] = (int) $s->id;
+                }
+
+                if (count($targetIds) >= $latestCount) {
+                    break;
+                }
+            }
+        } elseif ($request->boolean('select_all_filtered')) {
             // Extra safety: only allow bulk revoke when scoped to a specific school + class.
             if (! $request->filled('school_id') || ! $request->filled('class_section_id')) {
                 return redirect()->route('admin.staff.show', $staff)
