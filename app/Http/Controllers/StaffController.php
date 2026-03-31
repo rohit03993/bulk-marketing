@@ -20,6 +20,7 @@ use Illuminate\Support\Carbon;
 
 class StaffController extends Controller
 {
+    private const REVOKE_LATEST_BATCH = 10;
     private const LEAD_STATUSES = ['lead', 'interested', 'not_interested', 'walkin_done', 'admission_done', 'follow_up_later', 'converted'];
 
     public function show(Request $request, User $staff)
@@ -247,6 +248,20 @@ class StaffController extends Controller
                 ->get();
         }
 
+        // Schools that actually have students assigned to this telecaller (optionally scoped by class filter).
+        $revokeSchoolOptions = School::query()
+            ->whereIn('id', ClassSection::query()
+                ->whereIn('id', Student::query()
+                    ->where('assigned_to', $staff->id)
+                    ->when($filterClassSectionId, fn ($q) => $q->where('class_section_id', $filterClassSectionId))
+                    ->select('class_section_id')
+                )
+                ->select('school_id')
+                ->distinct()
+            )
+            ->orderBy('name')
+            ->get(['id', 'name']);
+
         return view('admin.staff.show', [
             'staff' => $staff,
             'scoreToday' => $scoreToday,
@@ -279,6 +294,7 @@ class StaffController extends Controller
             'filterLeadStatus' => $filterLeadStatus,
             'leadStatusOptions' => $leadStatusOptions,
             'schools' => $schools,
+            'revokeSchoolOptions' => $revokeSchoolOptions,
             'classSections' => $classSections,
         ]);
     }
@@ -344,7 +360,6 @@ class StaffController extends Controller
             'student_ids.*' => 'integer|exists:students,id',
             'select_all_filtered' => 'nullable|boolean',
             'revoke_latest' => 'nullable|boolean',
-            'latest_count' => 'nullable|integer|min:1|max:500',
         ]);
 
         $revoked = 0;
@@ -376,7 +391,7 @@ class StaffController extends Controller
                     ->with('error', __('Please select a School before revoking latest students.'));
             }
 
-            $latestCount = max(1, min((int) ($data['latest_count'] ?? 10), 500));
+            $latestCount = self::REVOKE_LATEST_BATCH;
 
             // Start from latest assignments; optional class/lead filters are already in baseQuery.
             $candidateStudents = (clone $baseQuery)

@@ -565,7 +565,7 @@
                                     required
                                     title="{{ __('Select school for latest revoke') }}">
                                 <option value="">{{ __('Select school') }}</option>
-                                @foreach (($schools ?? collect()) as $school)
+                                @foreach (($revokeSchoolOptions ?? collect()) as $school)
                                     <option value="{{ $school->id }}" {{ $selectedSchoolId === (int) $school->id ? 'selected' : '' }}>
                                         {{ $school->name }}
                                     </option>
@@ -577,9 +577,6 @@
                             @if ($filterLeadStatus)
                                 <input type="hidden" name="lead_status" value="{{ $filterLeadStatus }}">
                             @endif
-                            <input type="number" name="latest_count" min="1" max="500" value="10"
-                                   class="w-20 rounded-lg border border-blue-200 text-xs px-2 py-1.5"
-                                   title="{{ __('How many latest leads to revoke') }}">
                             <button type="submit"
                                     class="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-orange-600 hover:bg-orange-700 transition">
                                 {{ __('Revoke latest (school)') }}
