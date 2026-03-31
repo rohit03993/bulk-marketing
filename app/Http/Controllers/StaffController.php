@@ -9,6 +9,7 @@ use App\Models\Campaign;
 use App\Models\CampaignRecipient;
 use App\Models\School;
 use App\Models\ClassSection;
+use App\Models\StudentAssignmentTransfer;
 use App\Services\TelecallerScoreService;
 use App\Services\TelecallerCallReportingService;
 use Illuminate\Http\Request;
@@ -193,6 +194,26 @@ class StaffController extends Controller
             ->whereHas('campaign', fn ($q) => $q->where('shot_by', $staff->id))
             ->count();
 
+        $assignmentActivity = StudentAssignmentTransfer::with([
+            'student.classSection.school',
+            'fromUser',
+            'toUser',
+            'transferredByUser',
+        ])
+            ->where(function ($q) use ($staff) {
+                $q->where('to_user_id', $staff->id)
+                    ->orWhere('from_user_id', $staff->id);
+            })
+            ->when($filterFrom && $filterTo && $filterFrom->lte($filterTo), function ($q) use ($filterFrom, $filterTo) {
+                $q->whereBetween('transferred_at', [$filterFrom, $filterTo]);
+            })
+            ->when($filterSchoolId, function ($q) use ($filterSchoolId) {
+                $q->whereHas('student.classSection', fn ($sq) => $sq->where('school_id', $filterSchoolId));
+            })
+            ->orderByDesc('transferred_at')
+            ->paginate(10, ['*'], 'assignment_page')
+            ->withQueryString();
+
         $leadStatusOptions = [
             'lead' => __('Uncalled'),
             'interested' => __('Interested'),
@@ -246,6 +267,7 @@ class StaffController extends Controller
             'totalUncalled' => $totalUncalled,
             'uncalledStudentIdsAll' => $uncalledStudentIdsAll,
             'campaigns' => $campaigns,
+            'assignmentActivity' => $assignmentActivity,
             'messagesSent' => $messagesSent,
             'assignedTotal' => $assignedTotal,
             'convertedWalkin' => $convertedWalkin,

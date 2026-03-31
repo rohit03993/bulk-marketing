@@ -256,6 +256,46 @@
                 </div>
             </div>
 
+            {{-- Lead assignment activity --}}
+            <div class="bg-violet-50 rounded-2xl shadow-lg shadow-violet-100/60 border border-violet-200 p-5">
+                <div class="flex items-center gap-2 mb-4 rounded-xl bg-violet-100/70 border border-violet-200/70 px-4 py-3">
+                    <span class="flex h-8 w-1 rounded-full bg-violet-600"></span>
+                    <p class="text-sm font-semibold text-violet-900">{{ __('Lead assignment history') }}</p>
+                </div>
+                <p class="text-xs text-slate-500 mb-3">{{ __('Shows assignments/re-distributions for this telecaller with school and date.') }}</p>
+                <div class="overflow-x-auto rounded-xl border border-violet-100 overflow-hidden">
+                    <table class="min-w-full divide-y divide-violet-100 text-sm">
+                        <thead class="bg-white">
+                            <tr>
+                                <th class="px-4 py-3 text-left font-semibold text-violet-800">{{ __('Date') }}</th>
+                                <th class="px-4 py-3 text-left font-semibold text-violet-800">{{ __('Student') }}</th>
+                                <th class="px-4 py-3 text-left font-semibold text-violet-800">{{ __('School') }}</th>
+                                <th class="px-4 py-3 text-left font-semibold text-violet-800">{{ __('From -> To') }}</th>
+                                <th class="px-4 py-3 text-left font-semibold text-violet-800">{{ __('By') }}</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-violet-50/80 bg-white">
+                            @forelse (($assignmentActivity ?? collect()) as $a)
+                                <tr>
+                                    <td class="px-4 py-3 text-xs text-slate-600">{{ $a->transferred_at?->format('d M Y, h:i A') ?? '—' }}</td>
+                                    <td class="px-4 py-3 text-slate-700">{{ $a->student?->name ?? '—' }}</td>
+                                    <td class="px-4 py-3 text-slate-600">{{ $a->student?->classSection?->school?->name ?? '—' }}</td>
+                                    <td class="px-4 py-3 text-slate-700">{{ $a->fromUser?->name ?? __('Unassigned') }} → {{ $a->toUser?->name ?? '—' }}</td>
+                                    <td class="px-4 py-3 text-slate-600">{{ $a->transferredByUser?->name ?? '—' }}</td>
+                                </tr>
+                            @empty
+                                <tr>
+                                    <td colspan="5" class="px-4 py-6 text-sm text-slate-500 text-center">{{ __('No assignment activity in selected range.') }}</td>
+                                </tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+                @if (($assignmentActivity ?? null) && $assignmentActivity->hasPages())
+                    <div class="mt-3">{{ $assignmentActivity->links() }}</div>
+                @endif
+            </div>
+
             {{-- Calls summary (all time + optional range) --}}
             <div class="bg-sky-50 rounded-2xl shadow-lg shadow-sky-100/60 border border-sky-200 p-5">
                 <div class="flex items-center justify-between mb-5 rounded-xl bg-sky-100/70 border border-sky-200/70 px-4 py-3">

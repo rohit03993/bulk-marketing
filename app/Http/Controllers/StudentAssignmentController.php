@@ -122,11 +122,43 @@ class StudentAssignmentController extends Controller
             'student_ids' => 'required|array',
             'student_ids.*' => 'exists:students,id',
             'transfer_to' => 'required|exists:users,id',
-            'transfer_reason' => 'nullable|string|max:255',
-            'confirm_phrase' => 'required|string|in:TRANSFER',
-            'admin_password' => 'required|current_password',
-        ], [
-            'confirm_phrase.in' => __('Type TRANSFER exactly to confirm redistribution.'),
+            'filter_school_id' => 'nullable|integer',
+            'filter_session_id' => 'nullable|integer',
+            'filter_class_name' => 'nullable|string|max:100',
+            'filter_only_unassigned' => 'nullable|in:0,1',
+            'filter_current_assigned_to' => 'nullable|string|max:30',
+        ]);
+
+        $scopeQuery = Student::query()->whereIn('id', $data['student_ids']);
+        if (! empty($data['filter_school_id'])) {
+            $scopeQuery->whereHas('classSection', fn ($q) => $q->where('school_id', (int) $data['filter_school_id']));
+        }
+        if (! empty($data['filter_session_id'])) {
+            $scopeQuery->whereHas('classSection', fn ($q) => $q->where('academic_session_id', (int) $data['filter_session_id']));
+        }
+        if (! empty($data['filter_class_name'])) {
+            $scopeQuery->whereHas('classSection', fn ($q) => $q->where('class_name', trim((string) $data['filter_class_name'])));
+        }
+        if (($data['filter_only_unassigned'] ?? '0') === '1') {
+            $scopeQuery->whereNull('assigned_to');
+        }
+        if (! empty($data['filter_current_assigned_to'])) {
+            if ($data['filter_current_assigned_to'] === 'unassigned') {
+                $scopeQuery->whereNull('assigned_to');
+            } else {
+                $scopeQuery->where('assigned_to', (int) $data['filter_current_assigned_to']);
+            }
+        }
+
+        $eligibleStudentIds = $scopeQuery->pluck('id')->all();
+        if (empty($eligibleStudentIds)) {
+            return back()->with('error', __('No eligible students found in the current filter scope.'));
+        }
+
+        $data['student_ids'] = $eligibleStudentIds;
+
+        $request->validate([
+            'student_ids' => 'required|array|min:1',
         ]);
 
         $adminId = (int) Auth::id();
@@ -156,7 +188,7 @@ class StudentAssignmentController extends Controller
                     'to_user_id' => $targetUserId,
                     'transferred_by' => $adminId,
                     'transfer_batch_uuid' => $batchUuid,
-                    'reason' => trim((string) ($data['transfer_reason'] ?? '')) ?: null,
+                    'reason' => null,
                     'transferred_at' => $now,
                 ]);
 

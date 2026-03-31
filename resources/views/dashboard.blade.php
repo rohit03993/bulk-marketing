@@ -240,6 +240,58 @@
                     </div>
                 </div>
 
+                <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                    @php
+                        $assignFromValue = isset($assignFromAt) && $assignFromAt ? $assignFromAt->toDateString() : '';
+                        $assignToValue = isset($assignToAt) && $assignToAt ? $assignToAt->toDateString() : '';
+                    @endphp
+                    <div class="px-6 pt-6 pb-3 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
+                        <div>
+                            <p class="text-sm font-semibold text-slate-900">{{ __('Lead assignment activity') }}</p>
+                            <p class="mt-1 text-xs text-slate-500">{{ __('Shows who assigned/re-distributed and for which school.') }}</p>
+                        </div>
+                        <form method="GET" action="{{ route('dashboard') }}" class="flex items-end gap-2">
+                            <input type="date" name="assign_from" value="{{ $assignFromValue }}"
+                                   class="rounded-lg border-slate-200 text-xs px-2 py-1.5">
+                            <input type="date" name="assign_to" value="{{ $assignToValue }}"
+                                   class="rounded-lg border-slate-200 text-xs px-2 py-1.5">
+                            <button type="submit" class="inline-flex items-center justify-center px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 border border-slate-200">
+                                {{ __('Apply') }}
+                            </button>
+                        </form>
+                    </div>
+                    <div class="px-6 pb-6">
+                        <div class="overflow-x-auto rounded-lg border border-slate-200">
+                            <table class="min-w-full divide-y divide-slate-200 text-sm">
+                                <thead class="bg-slate-50">
+                                    <tr>
+                                        <th class="px-3 py-2 text-left text-xs font-semibold text-slate-600">{{ __('Date') }}</th>
+                                        <th class="px-3 py-2 text-left text-xs font-semibold text-slate-600">{{ __('Student') }}</th>
+                                        <th class="px-3 py-2 text-left text-xs font-semibold text-slate-600">{{ __('School') }}</th>
+                                        <th class="px-3 py-2 text-left text-xs font-semibold text-slate-600">{{ __('From -> To') }}</th>
+                                        <th class="px-3 py-2 text-left text-xs font-semibold text-slate-600">{{ __('By') }}</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-100 bg-white">
+                                    @forelse (($assignmentActivity ?? collect()) as $a)
+                                        <tr>
+                                            <td class="px-3 py-2 text-xs text-slate-600">{{ $a->transferred_at?->format('d M Y, h:i A') ?? '—' }}</td>
+                                            <td class="px-3 py-2 text-slate-700">{{ $a->student?->name ?? '—' }}</td>
+                                            <td class="px-3 py-2 text-slate-600">{{ $a->student?->classSection?->school?->name ?? '—' }}</td>
+                                            <td class="px-3 py-2 text-slate-700">{{ $a->fromUser?->name ?? __('Unassigned') }} → {{ $a->toUser?->name ?? '—' }}</td>
+                                            <td class="px-3 py-2 text-slate-600">{{ $a->transferredByUser?->name ?? '—' }}</td>
+                                        </tr>
+                                    @empty
+                                        <tr>
+                                            <td colspan="5" class="px-3 py-6 text-xs text-slate-500 text-center">{{ __('No assignment activity in selected date range.') }}</td>
+                                        </tr>
+                                    @endforelse
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
                 @php
                     $leaderboard = $leaderboard ?? [];
                     $leaderboardFrom = $leaderboardFrom ?? null;
@@ -459,6 +511,36 @@
                             <p class="text-2xl font-bold text-emerald-600">{{ $stats['messages_sent'] ?? 0 }}</p>
                             <p class="text-[11px] text-slate-500">{{ __('Messages Sent') }}</p>
                         </div>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-5">
+                    <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">{{ __('Recent Lead Assignments To Me') }}</p>
+                    <div class="overflow-x-auto rounded-xl border border-slate-200 overflow-hidden">
+                        <table class="min-w-full divide-y divide-slate-200 text-sm">
+                            <thead class="bg-slate-50">
+                                <tr>
+                                    <th class="px-3 py-2 text-left text-xs font-semibold text-slate-600">{{ __('Date') }}</th>
+                                    <th class="px-3 py-2 text-left text-xs font-semibold text-slate-600">{{ __('Student') }}</th>
+                                    <th class="px-3 py-2 text-left text-xs font-semibold text-slate-600">{{ __('School') }}</th>
+                                    <th class="px-3 py-2 text-left text-xs font-semibold text-slate-600">{{ __('From') }}</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-100 bg-white">
+                                @forelse (($assignmentActivity ?? collect()) as $a)
+                                    <tr>
+                                        <td class="px-3 py-2 text-xs text-slate-600">{{ $a->transferred_at?->format('d M Y, h:i A') ?? '—' }}</td>
+                                        <td class="px-3 py-2 text-slate-700">{{ $a->student?->name ?? '—' }}</td>
+                                        <td class="px-3 py-2 text-slate-600">{{ $a->student?->classSection?->school?->name ?? '—' }}</td>
+                                        <td class="px-3 py-2 text-slate-600">{{ $a->fromUser?->name ?? __('Unassigned') }}</td>
+                                    </tr>
+                                @empty
+                                    <tr>
+                                        <td colspan="4" class="px-3 py-6 text-xs text-slate-500 text-center">{{ __('No recent assignments.') }}</td>
+                                    </tr>
+                                @endforelse
+                            </tbody>
+                        </table>
                     </div>
                 </div>
 

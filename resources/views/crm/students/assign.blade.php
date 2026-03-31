@@ -29,7 +29,7 @@
                     <div class="flex flex-wrap gap-3 items-end">
                         <div class="min-w-[140px]">
                             <label class="block text-xs font-medium text-gray-500">{{ __('School') }}</label>
-                            <select name="school_id" data-school-search="1" class="mt-1 block w-full rounded-md border-gray-300 text-sm">
+                            <select name="school_id" class="mt-1 block w-full rounded-md border-gray-300 text-sm">
                                 <option value="">{{ __('All') }}</option>
                                 @foreach ($schools as $s)
                                     <option value="{{ $s->id }}" {{ request('school_id') == $s->id ? 'selected' : '' }}>{{ $s->name }}</option>
@@ -151,7 +151,7 @@
                         @csrf
                         <div class="flex items-center justify-between gap-2">
                             <p class="text-sm font-semibold text-indigo-800">{{ __('Redistribute leads') }}</p>
-                            <span class="text-[11px] text-indigo-700">{{ __('Secure flow with audit log') }}</span>
+                            <span class="text-[11px] text-indigo-700">{{ __('Audit log enabled') }}</span>
                         </div>
                         <div class="grid grid-cols-1 sm:grid-cols-4 gap-2">
                             <div>
@@ -166,19 +166,12 @@
                                     @endforeach
                                 </select>
                             </div>
-                            <div>
-                                <label class="block text-xs font-medium text-gray-500">{{ __('Reason (optional)') }}</label>
-                                <input type="text" name="transfer_reason" maxlength="255" class="mt-1 block w-full rounded-md border-gray-300 text-sm" placeholder="{{ __('Workload balancing') }}">
-                            </div>
-                            <div>
-                                <label class="block text-xs font-medium text-gray-500">{{ __('Type to confirm') }}</label>
-                                <input type="text" name="confirm_phrase" class="mt-1 block w-full rounded-md border-gray-300 text-sm" placeholder="TRANSFER" required>
-                            </div>
-                            <div>
-                                <label class="block text-xs font-medium text-gray-500">{{ __('Admin password') }}</label>
-                                <input type="password" name="admin_password" class="mt-1 block w-full rounded-md border-gray-300 text-sm" autocomplete="current-password" required>
-                            </div>
                         </div>
+                        <input type="hidden" name="filter_school_id" value="{{ request('school_id') }}">
+                        <input type="hidden" name="filter_session_id" value="{{ request('session_id') }}">
+                        <input type="hidden" name="filter_class_name" value="{{ request('class_name') }}">
+                        <input type="hidden" name="filter_only_unassigned" value="{{ request('only_unassigned') === '1' ? '1' : '0' }}">
+                        <input type="hidden" name="filter_current_assigned_to" value="{{ request('current_assigned_to') }}">
                         <div class="js-selected-ids"></div>
                         <button type="submit" class="w-full px-4 py-2 bg-indigo-700 text-white text-xs rounded-md hover:bg-indigo-800">
                             {{ __('Redistribute selected leads') }}

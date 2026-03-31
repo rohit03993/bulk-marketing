@@ -234,6 +234,24 @@ Route::middleware(['auth', 'verified'])->group(function () {
             });
             $mode = 'admin';
 
+            $assignFrom = trim((string) request('assign_from', ''));
+            $assignTo = trim((string) request('assign_to', ''));
+            $assignFromAt = $assignFrom ? \Carbon\Carbon::parse($assignFrom)->startOfDay() : now()->subDays(6)->startOfDay();
+            $assignToAt = $assignTo ? \Carbon\Carbon::parse($assignTo)->endOfDay() : now()->endOfDay();
+            if ($assignFromAt->gt($assignToAt)) {
+                $assignFromAt = $assignToAt->copy()->subDays(6)->startOfDay();
+            }
+            $assignmentActivity = \App\Models\StudentAssignmentTransfer::with([
+                'student.classSection.school',
+                'fromUser',
+                'toUser',
+                'transferredByUser',
+            ])
+                ->whereBetween('transferred_at', [$assignFromAt, $assignToAt])
+                ->orderByDesc('transferred_at')
+                ->limit(20)
+                ->get();
+
             // Telecaller leaderboard (full history: from each telecaller’s first call till now).
             $leaderboardFrom = null;
             $leaderboardToEnd = null;
@@ -280,7 +298,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
                 'schoolBreakdown',
                 'schoolOptions',
                 'selectedSchoolId',
-                'telecallerAggs'
+                'telecallerAggs',
+                'assignmentActivity',
+                'assignFromAt',
+                'assignToAt'
             ));
         }
 
@@ -415,6 +436,16 @@ Route::middleware(['auth', 'verified'])->group(function () {
         $recentCampaigns = $recentCampaignsList->map(function ($c) use ($sentCounts) {
             return (object) ['campaign' => $c, 'sent' => $sentCounts[$c->id] ?? 0, 'total' => $c->total_recipients];
         });
+        $assignmentActivity = \App\Models\StudentAssignmentTransfer::with([
+            'student.classSection.school',
+            'fromUser',
+            'toUser',
+            'transferredByUser',
+        ])
+            ->where('to_user_id', $userId)
+            ->orderByDesc('transferred_at')
+            ->limit(10)
+            ->get();
         $mode = 'telecaller';
         $schools = collect();
 
@@ -427,7 +458,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
             'dailyNewFollowup',
             'callsRangeTotals',
             'rangeLabel',
-            'dailyCapNote'
+            'dailyCapNote',
+            'assignmentActivity'
         ));
     })->name('dashboard');
 
