@@ -554,13 +554,23 @@
                             </button>
                         </form>
                     @endif
-                    @if (($totalUncalled ?? 0) > 0 && $selectedSchoolId > 0)
+                    @if (($totalUncalled ?? 0) > 0)
                         <form method="POST" action="{{ route('admin.staff.revoke-students', $staff) }}"
                               class="flex items-center gap-2"
                               onsubmit="return confirm('{{ __('Revoke latest selected uncalled students in current filter scope?') }}')">
                             @csrf
                             <input type="hidden" name="revoke_latest" value="1">
-                            <input type="hidden" name="school_id" value="{{ $selectedSchoolId }}">
+                            <select name="school_id"
+                                    class="rounded-lg border border-blue-200 text-xs px-2 py-1.5 min-w-[170px]"
+                                    required
+                                    title="{{ __('Select school for latest revoke') }}">
+                                <option value="">{{ __('Select school') }}</option>
+                                @foreach (($schools ?? collect()) as $school)
+                                    <option value="{{ $school->id }}" {{ $selectedSchoolId === (int) $school->id ? 'selected' : '' }}>
+                                        {{ $school->name }}
+                                    </option>
+                                @endforeach
+                            </select>
                             @if ($selectedClassSectionId > 0)
                                 <input type="hidden" name="class_section_id" value="{{ $selectedClassSectionId }}">
                             @endif
@@ -575,10 +585,6 @@
                                 {{ __('Revoke latest (school)') }}
                             </button>
                         </form>
-                    @elseif (($totalUncalled ?? 0) > 0)
-                        <span class="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-medium text-orange-700 bg-orange-50 border border-orange-200">
-                            {{ __('Select a School filter to enable "Revoke latest".') }}
-                        </span>
                     @endif
                 </div>
                 <div class="overflow-x-auto rounded-xl border border-blue-100 overflow-hidden">
