@@ -151,7 +151,8 @@ class StaffController extends Controller
         $studentsQuery = Student::with(['classSection.school'])
             ->where('assigned_to', $staff->id)
             ->when($filterAddedByMe, fn ($q) => $q->where('assigned_by', $staff->id))
-            ->orderBy('name');
+            ->orderByDesc('assigned_at')
+            ->orderByDesc('id');
         if ($filterLeadStatus !== null) {
             if ($filterLeadStatus === 'converted') {
                 $studentsQuery->whereIn('lead_status', ['walkin_done', 'admission_done']);
