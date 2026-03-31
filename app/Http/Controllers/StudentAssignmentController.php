@@ -139,21 +139,20 @@ class StudentAssignmentController extends Controller
 
         DB::transaction(function () use ($data, $targetUserId, $adminId, $batchUuid, $now, &$moved, &$skipped) {
             $students = Student::query()->whereIn('id', $data['student_ids'])
-                ->whereNotNull('assigned_to')
                 ->lockForUpdate()
                 ->select(['id', 'assigned_to'])
                 ->get();
 
             foreach ($students as $student) {
                 $fromUserId = (int) ($student->assigned_to ?? 0);
-                if ($fromUserId <= 0 || $fromUserId === $targetUserId) {
+                if ($fromUserId === $targetUserId) {
                     $skipped++;
                     continue;
                 }
 
                 StudentAssignmentTransfer::create([
                     'student_id' => (int) $student->id,
-                    'from_user_id' => $fromUserId,
+                    'from_user_id' => $fromUserId > 0 ? $fromUserId : null,
                     'to_user_id' => $targetUserId,
                     'transferred_by' => $adminId,
                     'transfer_batch_uuid' => $batchUuid,
