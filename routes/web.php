@@ -249,8 +249,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
             ])
                 ->whereBetween('transferred_at', [$assignFromAt, $assignToAt])
                 ->orderByDesc('transferred_at')
-                ->limit(20)
-                ->get();
+                ->paginate(25, ['*'], 'assignment_page')
+                ->withQueryString();
 
             // Telecaller leaderboard (full history: from each telecaller’s first call till now).
             $leaderboardFrom = null;

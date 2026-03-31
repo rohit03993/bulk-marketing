@@ -289,6 +289,9 @@
                                 </tbody>
                             </table>
                         </div>
+                        @if (($assignmentActivity ?? null) && $assignmentActivity instanceof \Illuminate\Pagination\AbstractPaginator && $assignmentActivity->hasPages())
+                            <div class="mt-3">{{ $assignmentActivity->links() }}</div>
+                        @endif
                     </div>
                 </div>
 
