@@ -275,6 +275,19 @@ class StaffController extends Controller
             })
             ->values();
 
+        // Schools that have any assigned leads for this telecaller (for inline students-section filter).
+        $assignedSchoolOptions = School::query()
+            ->whereIn('id', ClassSection::query()
+                ->whereIn('id', Student::query()
+                    ->where('assigned_to', $staff->id)
+                    ->select('class_section_id')
+                )
+                ->select('school_id')
+                ->distinct()
+            )
+            ->orderBy('name')
+            ->get(['id', 'name']);
+
         return view('admin.staff.show', [
             'staff' => $staff,
             'scoreToday' => $scoreToday,
@@ -308,6 +321,7 @@ class StaffController extends Controller
             'leadStatusOptions' => $leadStatusOptions,
             'schools' => $schools,
             'revokeSchoolOptions' => $revokeSchoolOptions,
+            'assignedSchoolOptions' => $assignedSchoolOptions,
             'classSections' => $classSections,
         ]);
     }

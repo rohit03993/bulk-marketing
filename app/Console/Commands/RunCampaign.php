@@ -10,6 +10,7 @@ use App\Models\StudentCall;
 use App\Models\User;
 use App\Services\AisensyService;
 use Illuminate\Console\Command;
+use Illuminate\Support\Carbon;
 
 class RunCampaign extends Command
 {
@@ -24,15 +25,21 @@ class RunCampaign extends Command
         $campaignId = (int) $this->argument('campaign');
         $batchSizeFromSettings = (int) Setting::get('campaign_batch_size', (string) config('campaigns.batch_size', 10));
         $batchOption = $this->option('batch');
-        $batchSize = is_numeric($batchOption) ? (int) $batchOption : 0;
-        $batchSize = $batchSize > 0 ? $batchSize : $batchSizeFromSettings;
-        if ($batchSize < 1) {
-            $batchSize = 10;
-        }
 
         /** @var Campaign $campaign */
         $campaign = Campaign::with(['template', 'school', 'academicSession', 'recipients.student.classSection.school', 'recipients.student.classSection.academicSession'])
             ->findOrFail($campaignId);
+
+        $batchSize = is_numeric($batchOption) ? (int) $batchOption : 0;
+        if ($batchSize < 1) {
+            $batchSize = (int) ($campaign->batch_size_override ?? 0);
+        }
+        if ($batchSize < 1) {
+            $batchSize = $batchSizeFromSettings;
+        }
+        if ($batchSize < 1) {
+            $batchSize = 10;
+        }
 
         if ($campaign->status === 'completed') {
             $this->info('Campaign already completed.');
@@ -50,7 +57,7 @@ class RunCampaign extends Command
         }
 
         if (! $campaign->started_at) {
-            $campaign->started_at = now();
+            $campaign->started_at = Carbon::now();
         }
 
         $campaign->save();
@@ -140,7 +147,7 @@ class RunCampaign extends Command
         if ($remaining === 0) {
             $campaign->refresh();
             $campaign->status = 'completed';
-            $campaign->finished_at = now();
+            $campaign->finished_at = Carbon::now();
             $campaign->save();
 
             $this->info('Campaign completed.');
@@ -154,10 +161,16 @@ class RunCampaign extends Command
             $campaign->status = 'running';
             $campaign->save();
 
-            $delayMinutes = (int) Setting::get(
-                'campaign_next_batch_delay_minutes',
-                (string) max(0, (int) round(((int) config('campaigns.next_batch_delay_seconds', 0)) / 60))
-            );
+            $delayMinutes = (int) ($campaign->delay_minutes_override ?? 0);
+            if ($delayMinutes < 0) {
+                $delayMinutes = 0;
+            }
+            if ($delayMinutes === 0) {
+                $delayMinutes = (int) Setting::get(
+                    'campaign_next_batch_delay_minutes',
+                    (string) max(0, (int) round(((int) config('campaigns.next_batch_delay_seconds', 0)) / 60))
+                );
+            }
             $delaySeconds = max(0, $delayMinutes) * 60;
             if ($delaySeconds > 0) {
                 RunCampaignJob::dispatch($campaign->id)->delay(now()->addSeconds($delaySeconds));

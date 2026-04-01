@@ -556,7 +556,7 @@
                     @endif
                     @if (($totalUncalled ?? 0) > 0)
                         <form method="POST" action="{{ route('admin.staff.revoke-students', $staff) }}"
-                              class="flex items-center gap-2"
+                              class="flex flex-wrap items-center gap-2"
                               onsubmit="return confirm('{{ __('Revoke latest selected uncalled students in current filter scope?') }}')">
                             @csrf
                             <input type="hidden" name="revoke_latest" value="1">
@@ -579,10 +579,10 @@
                                 <input type="hidden" name="lead_status" value="{{ $filterLeadStatus }}">
                             @endif
                             <button type="submit"
-                                    class="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-orange-600 hover:bg-orange-700 transition">
+                                    class="inline-flex items-center px-4 py-2 rounded-lg text-xs font-bold text-white bg-orange-600 hover:bg-orange-700 border border-orange-700 shadow-sm transition focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-1">
                                 {{ __('Revoke latest (school)') }}
                             </button>
-                            <span id="revoke_latest_hint" class="inline-flex items-center px-2.5 py-1 rounded-md text-[11px] font-medium text-orange-700 bg-orange-50 border border-orange-200">
+                            <span id="revoke_latest_hint" class="inline-flex items-center px-2.5 py-1 rounded-md text-[11px] font-semibold text-orange-800 bg-orange-50 border border-orange-200">
                                 {{ __('Select school to see eligible count') }}
                             </span>
                         </form>
@@ -847,7 +847,7 @@
             if (params.has('students_page')) targetId = 'students-section';
             else if (params.has('calls_page')) targetId = 'recent-calls-section';
             else if (params.has('campaigns_page')) targetId = 'campaigns-section';
-            if (!targetId) return;
+            if (!targetId) targetId = 'students-section';
             const el = document.getElementById(targetId);
             if (el) {
                 setTimeout(function () {
@@ -861,6 +861,7 @@
             const schoolSel = document.getElementById('revoke_latest_school_id');
             const hint = document.getElementById('revoke_latest_hint');
             if (!schoolSel || !hint) return;
+            const currentSchoolId = '{{ (string) ($selectedSchoolId ?? '') }}';
 
             const updateHint = function () {
                 const opt = schoolSel.options[schoolSel.selectedIndex];
@@ -872,7 +873,16 @@
                 hint.textContent = 'Eligible uncalled in selected school: ' + n + ' (revoke latest 10)';
             };
 
-            schoolSel.addEventListener('change', updateHint);
+            schoolSel.addEventListener('change', function () {
+                updateHint();
+                const selected = String(schoolSel.value || '');
+                if (selected === String(currentSchoolId || '')) return;
+                const params = new URLSearchParams(window.location.search);
+                if (selected) params.set('school_id', selected);
+                else params.delete('school_id');
+                params.set('students_page', '1');
+                window.location.search = params.toString();
+            });
             updateHint();
         })();
     </script>

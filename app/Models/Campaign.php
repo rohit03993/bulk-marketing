@@ -22,6 +22,8 @@ class Campaign extends Model
         'sent_count',
         'failed_count',
         'scheduled_at',
+        'batch_size_override',
+        'delay_minutes_override',
         'started_at',
         'finished_at',
         'created_by',
@@ -31,6 +33,8 @@ class Campaign extends Model
 
     protected $casts = [
         'scheduled_at' => 'datetime',
+        'batch_size_override' => 'integer',
+        'delay_minutes_override' => 'integer',
         'started_at' => 'datetime',
         'finished_at' => 'datetime',
         'shot_at' => 'datetime',

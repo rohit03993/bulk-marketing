@@ -13,6 +13,7 @@ use App\Models\Setting;
 use App\Models\Student;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Carbon\Carbon;
 
 class CampaignController extends Controller
 {
@@ -152,6 +153,7 @@ class CampaignController extends Controller
         }
 
         $template = AisensyTemplate::findOrFail($valid['aisensy_template_id']);
+        /** @var \Illuminate\Database\Eloquent\Collection<int, \App\Models\Student> $students */
         $students = Student::whereIn('class_section_id', $valid['class_section_ids'])
             ->where('status', 'active')
             ->with(['classSection.school', 'classSection.academicSession'])
@@ -214,14 +216,16 @@ class CampaignController extends Controller
         }
         $recipients = $campaign->recipients()->with('student')->paginate(50);
 
-        $campaignBatchSize = max(1, (int) Setting::get('campaign_batch_size', (string) config('campaigns.batch_size', 10)));
-        $campaignDelayMinutes = max(
+        $globalBatchSize = max(1, (int) Setting::get('campaign_batch_size', (string) config('campaigns.batch_size', 10)));
+        $globalDelayMinutes = max(
             0,
             (int) Setting::get(
                 'campaign_next_batch_delay_minutes',
                 (string) max(0, (int) round(((int) config('campaigns.next_batch_delay_seconds', 300)) / 60))
             )
         );
+        $campaignBatchSize = max(1, (int) ($campaign->batch_size_override ?: $globalBatchSize));
+        $campaignDelayMinutes = max(0, (int) ($campaign->delay_minutes_override ?? $globalDelayMinutes));
         $showBulkTiming = (int) ($campaign->total_recipients ?? 0) > 1;
 
         return view('crm.campaigns.show', compact(
@@ -234,29 +238,74 @@ class CampaignController extends Controller
         ));
     }
 
-    public function shoot(Campaign $campaign)
+    public function shoot(Request $request, Campaign $campaign)
     {
         $pending = $campaign->recipients()->where('status', 'pending')->exists();
         if (! $pending) {
             return redirect()->route('campaigns.show', $campaign)
                 ->with('info', __('No pending recipients to send.'));
         }
-        if ($campaign->status === 'draft') {
-            $campaign->update([
-                'status' => 'queued',
-                'shot_by' => auth()->id(),
-                'shot_at' => now(),
-            ]);
-        } else {
-            $campaign->update([
-                'shot_by' => auth()->id(),
-                'shot_at' => now(),
-            ]);
+
+        $validated = $request->validate([
+            'dispatch_mode' => 'nullable|in:immediate,scheduled',
+            'scheduled_for' => 'nullable|date_format:Y-m-d\TH:i',
+            'scheduled_batch_size' => 'nullable|integer|min:1|max:500',
+            'scheduled_delay_minutes' => 'nullable|integer|min:0|max:1440',
+        ]);
+
+        $mode = (string) ($validated['dispatch_mode'] ?? 'immediate');
+        $scheduledAt = null;
+        $batchOverride = null;
+        $delayOverride = null;
+
+        if ($mode === 'scheduled') {
+            $scheduledForRaw = (string) ($validated['scheduled_for'] ?? '');
+            if ($scheduledForRaw === '') {
+                return redirect()->route('campaigns.show', $campaign)->withErrors([
+                    'scheduled_for' => __('Please select schedule date and time.'),
+                ]);
+            }
+
+            $scheduledAt = Carbon::createFromFormat('Y-m-d\TH:i', $scheduledForRaw, 'Asia/Kolkata');
+            if (! $scheduledAt || $scheduledAt->lessThanOrEqualTo(now('Asia/Kolkata'))) {
+                return redirect()->route('campaigns.show', $campaign)->withErrors([
+                    'scheduled_for' => __('Scheduled date/time must be in the future (IST).'),
+                ]);
+            }
+
+            $batchOverride = (int) ($validated['scheduled_batch_size'] ?? 0);
+            $delayOverride = (int) ($validated['scheduled_delay_minutes'] ?? 0);
+            if ($batchOverride < 1) {
+                return redirect()->route('campaigns.show', $campaign)->withErrors([
+                    'scheduled_batch_size' => __('Please set messages per run for this scheduled campaign.'),
+                ]);
+            }
+            if ($delayOverride < 0) {
+                $delayOverride = 0;
+            }
         }
+
+        $campaign->update([
+            'status' => 'queued',
+            'shot_by' => auth()->id(),
+            'shot_at' => now(),
+            'scheduled_at' => $scheduledAt,
+            'batch_size_override' => $mode === 'scheduled' ? $batchOverride : null,
+            'delay_minutes_override' => $mode === 'scheduled' ? $delayOverride : null,
+        ]);
+
+        if ($mode === 'scheduled' && $scheduledAt) {
+            $runAt = $scheduledAt->copy()->timezone(config('app.timezone'));
+            RunCampaignJob::dispatch($campaign->id)->delay($runAt);
+
+            return redirect()->route('campaigns.show', $campaign)
+                ->with('success', __('Campaign scheduled for :when (IST).', ['when' => $scheduledAt->format('d M Y, h:i A')]));
+        }
+
         RunCampaignJob::dispatch($campaign->id);
 
         return redirect()->route('campaigns.show', $campaign)
-            ->with('success', __('Sending started. Counts will update in real time.'));
+            ->with('success', __('Sending started immediately. Counts will update in real time.'));
     }
 
     public function stop(Campaign $campaign)

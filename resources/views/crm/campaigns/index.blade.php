@@ -64,6 +64,7 @@
                                     <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{{ __('Name') }}</th>
                                     <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{{ __('School') }}</th>
                                     <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{{ __('Template') }}</th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{{ __('Dispatch') }}</th>
                                     <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{{ __('Sent / Total') }}</th>
                                     <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{{ __('Status') }}</th>
                                     <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">{{ __('Actions') }}</th>
@@ -75,6 +76,18 @@
                                         <td class="px-4 py-3 font-medium text-gray-900">{{ $c->name }}</td>
                                         <td class="px-4 py-3 text-sm text-gray-600">{{ $c->school->name }}</td>
                                         <td class="px-4 py-3 text-sm text-gray-600">{{ $c->template->name }}</td>
+                                        <td class="px-4 py-3 text-xs text-gray-600">
+                                            @if ($c->scheduled_at)
+                                                <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-indigo-100 text-indigo-800">
+                                                    {{ __('Scheduled') }}
+                                                </span>
+                                                <div class="mt-1">{{ $c->scheduled_at->copy()->timezone('Asia/Kolkata')->format('d M Y, h:i A') }} IST</div>
+                                            @else
+                                                <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-emerald-100 text-emerald-800">
+                                                    {{ __('Immediate') }}
+                                                </span>
+                                            @endif
+                                        </td>
                                         <td class="px-4 py-3 text-sm" data-stat="sent-total">{{ $realCounts[$c->id] ?? $c->sent_count }} / {{ $c->total_recipients }}</td>
                                         <td class="px-4 py-3" data-stat="status">
                                             @if ($c->status === 'completed')

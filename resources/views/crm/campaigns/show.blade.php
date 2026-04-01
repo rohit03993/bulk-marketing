@@ -7,12 +7,47 @@
             </div>
             <div class="flex items-center gap-2">
                 @if ($campaign->status === 'draft' && $campaign->recipients()->where('status', 'pending')->exists())
-                    <form method="POST" action="{{ route('campaigns.shoot', $campaign) }}" class="inline">
-                        @csrf
-                        <button type="submit" class="inline-flex items-center px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-md hover:bg-green-700">
-                            {{ __('Shoot campaign') }}
+                    <div class="inline-flex flex-col items-end gap-2">
+                        <button type="button" id="open_shoot_options" class="inline-flex items-center px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-md hover:bg-green-700">
+                            {{ __('Save') }}
                         </button>
-                    </form>
+                        <form method="POST" action="{{ route('campaigns.shoot', $campaign) }}" id="shoot_options_panel" class="hidden bg-white border border-slate-200 rounded-lg p-3 shadow-sm w-[560px] max-w-[90vw]">
+                            @csrf
+                            <p class="text-xs font-semibold text-slate-700 mb-2">{{ __('Dispatch options') }}</p>
+                            <div class="flex flex-wrap gap-4 items-center">
+                                <label class="inline-flex items-center gap-2 text-sm text-slate-700">
+                                    <input type="radio" name="dispatch_mode" value="immediate" id="dispatch_mode_immediate" {{ old('dispatch_mode', 'immediate') === 'immediate' ? 'checked' : '' }}>
+                                    {{ __('Shoot immediately') }}
+                                </label>
+                                <label class="inline-flex items-center gap-2 text-sm text-slate-700">
+                                    <input type="radio" name="dispatch_mode" value="scheduled" id="dispatch_mode_scheduled" {{ old('dispatch_mode') === 'scheduled' ? 'checked' : '' }}>
+                                    {{ __('Schedule') }}
+                                </label>
+                            </div>
+                            <div id="scheduled_fields" class="hidden mt-3 grid grid-cols-1 sm:grid-cols-3 gap-2">
+                                <div>
+                                    <label class="block text-[11px] text-gray-500">{{ __('Date & time (IST)') }}</label>
+                                    <input type="datetime-local" name="scheduled_for" id="scheduled_for" value="{{ old('scheduled_for') }}" class="mt-1 rounded-md border-gray-300 text-sm w-full">
+                                </div>
+                                <div>
+                                    <label class="block text-[11px] text-gray-500">{{ __('Messages per run') }}</label>
+                                    <input type="number" min="1" max="500" name="scheduled_batch_size" value="{{ old('scheduled_batch_size', (int) ($campaignBatchSize ?? 10)) }}" class="mt-1 rounded-md border-gray-300 text-sm w-full">
+                                </div>
+                                <div>
+                                    <label class="block text-[11px] text-gray-500">{{ __('Gap minutes') }}</label>
+                                    <input type="number" min="0" max="1440" name="scheduled_delay_minutes" value="{{ old('scheduled_delay_minutes', (int) ($campaignDelayMinutes ?? 5)) }}" class="mt-1 rounded-md border-gray-300 text-sm w-full">
+                                </div>
+                            </div>
+                            <div class="mt-3 flex justify-end gap-2">
+                                <button type="button" id="cancel_shoot_options" class="inline-flex items-center px-3 py-2 bg-slate-100 text-slate-700 text-xs font-medium rounded-md hover:bg-slate-200">
+                                    {{ __('Cancel') }}
+                                </button>
+                                <button type="submit" class="inline-flex items-center px-4 py-2 bg-green-600 text-white text-xs font-semibold rounded-md hover:bg-green-700">
+                                    {{ __('Shoot') }}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
                 @endif
                 @if (in_array($campaign->status, ['queued', 'running']) && $campaign->recipients()->where('status', 'pending')->exists())
                     <form method="POST" action="{{ route('campaigns.stop', $campaign) }}" class="inline" onsubmit="return confirm('{{ __('Pause this campaign? Current message in processing may complete, then sending will stop.') }}')">
@@ -49,6 +84,15 @@
             @if (session('info'))
                 <div class="rounded-md bg-blue-50 p-4 text-sm text-blue-800">{{ session('info') }}</div>
             @endif
+            @if ($errors->any())
+                <div class="rounded-md bg-red-50 p-4 text-sm text-red-800">
+                    <ul class="list-disc ml-5">
+                        @foreach ($errors->all() as $e)
+                            <li>{{ $e }}</li>
+                        @endforeach
+                    </ul>
+                </div>
+            @endif
 
             <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4" id="campaign-stats">
                 <div class="bg-white rounded-lg shadow p-4">
@@ -80,6 +124,11 @@
             @if ($campaign->shot_at && $campaign->shotByUser)
                 <div class="bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm text-slate-700">
                     {{ __('Shot by') }} <strong>{{ $campaign->shotByUser->name }}</strong> {{ __('on') }} {{ $campaign->shot_at->format('d M Y, h:i A') }}
+                    @if ($campaign->scheduled_at)
+                        <div class="mt-1 text-indigo-700">
+                            {{ __('Scheduled for') }} <strong>{{ $campaign->scheduled_at->copy()->timezone('Asia/Kolkata')->format('d M Y, h:i A') }}</strong> {{ __('(IST)') }}
+                        </div>
+                    @endif
                 </div>
             @endif
 
@@ -235,6 +284,40 @@
     </div>
 
     @if (in_array($campaign->status, ['queued', 'running']) || ($pendingCount ?? 0) > 0)
+    <script>
+        (function () {
+            const panel = document.getElementById('shoot_options_panel');
+            const openBtn = document.getElementById('open_shoot_options');
+            const cancelBtn = document.getElementById('cancel_shoot_options');
+            const modeImmediate = document.getElementById('dispatch_mode_immediate');
+            const modeScheduled = document.getElementById('dispatch_mode_scheduled');
+            const wrap = document.getElementById('scheduled_fields');
+            const dt = document.getElementById('scheduled_for');
+            if (!wrap || !dt) return;
+            const now = new Date();
+            const pad = (n) => String(n).padStart(2, '0');
+            const localMin = now.getFullYear() + '-' + pad(now.getMonth() + 1) + '-' + pad(now.getDate()) + 'T' + pad(now.getHours()) + ':' + pad(now.getMinutes());
+            dt.min = localMin;
+
+            const sync = function () {
+                const scheduled = !!modeScheduled && modeScheduled.checked;
+                wrap.classList.toggle('hidden', !scheduled);
+                dt.required = scheduled;
+            };
+            modeImmediate && modeImmediate.addEventListener('change', sync);
+            modeScheduled && modeScheduled.addEventListener('change', sync);
+            openBtn && openBtn.addEventListener('click', function () {
+                panel.classList.remove('hidden');
+            });
+            cancelBtn && cancelBtn.addEventListener('click', function () {
+                panel.classList.add('hidden');
+            });
+            @if($errors->has('scheduled_for') || $errors->has('scheduled_batch_size') || $errors->has('scheduled_delay_minutes'))
+            panel && panel.classList.remove('hidden');
+            @endif
+            sync();
+        })();
+    </script>
     <script>
         (function () {
             const el = document.querySelector('[data-stats-url]');
