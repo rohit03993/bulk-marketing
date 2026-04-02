@@ -355,15 +355,15 @@
                                             </td>
                                             <td class="px-3 py-2 text-slate-800 font-semibold">
                                                 <div class="flex flex-col">
-                                                    <span title="{{ __('Score = ConversionScore*99 + ActivityBonus*1. ConversionPoints = Adm + Walk-in. ConversionScore = ConversionPoints/daily_target. ActivityBonus = min(1, RecognizedConnectedOutcomes/daily_target).') }}">
+                                                    <span title="{{ __('Leaderboard Score% = 0.8 * (Conversions / MaxConversionsInLeaderboard) + 0.2 * (CallsMade / MaxCallsInLeaderboard). Conversions = AdmissionDone + WalkinDone.') }}">
                                                         {{ $row['score'] }}%
                                                     </span>
                                                     <span class="text-[11px] text-slate-500 font-normal mt-1 leading-snug">
                                                         {{ __('Adm') }}: {{ $b['lead_admission'] ?? 0 }} ·
                                                         {{ __('Walk-in') }}: {{ $b['lead_walkin'] ?? 0 }}<br/>
                                                         {{ __('ConvPts') }}: {{ $b['conversion_points'] ?? 0 }} ·
-                                                        {{ __('ConvScore') }}: {{ $b['conversion_score_percent'] ?? 0 }}% ·
-                                                        {{ __('Activity') }}: {{ $b['activity_bonus_percent'] ?? 0 }}%
+                                                        {{ __('ConvShare') }}: {{ $b['conversion_share_percent'] ?? 0 }}% ·
+                                                        {{ __('CallsShare') }}: {{ $b['calls_share_percent'] ?? 0 }}%
                                                     </span>
                                                 </div>
                                             </td>

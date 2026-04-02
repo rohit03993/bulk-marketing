@@ -267,18 +267,52 @@ Route::middleware(['auth', 'verified'])->group(function () {
                 $scoreService = new \App\Services\TelecallerScoreService();
                 $dailyTarget = 25;
 
+                $maxConversionPoints = 0;
+                $maxTotalCalls = 0;
+
                 foreach ($telecallers as $staff) {
                     $overall = $scoreService->computeOverallAverage($staff->id, $dailyTarget);
                     if (($overall['days'] ?? 0) <= 0) {
                         continue;
                     }
 
+                    $b = $overall['breakdown'] ?? [];
+                    $leadAdmission = (int) ($b['lead_admission'] ?? 0);
+                    $leadWalkin = (int) ($b['lead_walkin'] ?? 0);
+                    $conversionPoints = $leadAdmission + $leadWalkin;
+                    $totalCalls = (int) ($b['total_calls'] ?? 0);
+
+                    $maxConversionPoints = max($maxConversionPoints, $conversionPoints);
+                    $maxTotalCalls = max($maxTotalCalls, $totalCalls);
+
                     $leaderboard[] = [
                         'user' => $staff,
-                        'score' => $overall['score'],
-                        'breakdown' => $overall['breakdown'] ?? [],
+                        'score' => 0, // computed after loop using normalized conversion+call weights
+                        'breakdown' => $b,
+                        'conversion_points' => $conversionPoints,
+                        'total_calls_for_score' => $totalCalls,
                     ];
                 }
+
+                // Conversion-heavy scoring with a small calls-made component.
+                // Important: no fixed "25 calls/day cap" normalization here.
+                foreach ($leaderboard as &$row) {
+                    $convPts = (int) ($row['conversion_points'] ?? 0);
+                    $callsMade = (int) ($row['total_calls_for_score'] ?? 0);
+
+                    $convNorm = $maxConversionPoints > 0 ? ($convPts / $maxConversionPoints) : 0.0; // 0..1
+                    $callsNorm = $maxTotalCalls > 0 ? ($callsMade / $maxTotalCalls) : 0.0; // 0..1
+
+                    // 80% conversions + 20% calls volume. This makes the % understandable,
+                    // while still giving a small boost for active calling.
+                    $row['score'] = (int) round(($convNorm * 0.8 + $callsNorm * 0.2) * 100);
+
+                    // Store normalized shares for UI transparency.
+                    $row['breakdown']['conversion_points'] = $convPts;
+                    $row['breakdown']['conversion_share_percent'] = (int) round($convNorm * 100);
+                    $row['breakdown']['calls_share_percent'] = (int) round($callsNorm * 100);
+                }
+                unset($row);
 
                 usort($leaderboard, function ($a, $b) {
                     $admA = (int) ($a['breakdown']['lead_admission'] ?? 0);
