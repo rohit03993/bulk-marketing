@@ -354,7 +354,20 @@
                                                 </a>
                                             </td>
                                             <td class="px-3 py-2 text-slate-800 font-semibold">
-                                                {{ $row['score'] }}%
+                                                <div class="flex flex-col">
+                                                    <span title="{{ __('Score = (Outcome*80) + (Notes*8) + (Engagement*5) + (Follow-up*5) + (VolumeRatio*2). Outcome/Notes/Engagement are derived from connected calls.') }}">
+                                                        {{ $row['score'] }}%
+                                                    </span>
+                                                    <span class="text-[11px] text-slate-500 font-normal mt-1 leading-snug">
+                                                        {{ __('Outcome') }}: {{ $b['outcome_score_percent'] ?? 0 }}% ·
+                                                        {{ __('Notes') }}: {{ $b['notes_score_percent'] ?? 0 }}% ·
+                                                        {{ __('Eng.') }}: {{ $b['engagement_score_percent'] ?? 0 }}% ·
+                                                        {{ __('Follow-up') }}: {{ $b['followup_compliance'] ?? 0 }}%<br/>
+                                                        {{ __('Adm') }}: {{ $b['lead_admission'] ?? 0 }} ·
+                                                        {{ __('Walk-in') }}: {{ $b['lead_walkin'] ?? 0 }} ·
+                                                        {{ __('Volume') }}: {{ $b['total_calls'] ?? 0 }}/{{ $b['daily_target'] ?? 25 }}
+                                                    </span>
+                                                </div>
                                             </td>
                                             <td class="px-3 py-2 text-slate-600">
                                                 {{ $b['total_calls'] ?? 0 }}

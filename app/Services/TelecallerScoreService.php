@@ -124,6 +124,8 @@ class TelecallerScoreService
 
         // Outcome score sum across connected calls.
         $outcomeScoreSum = 0.0;
+        $outcomeScoreCount = 0;
+        $outcomeIgnoredCount = 0;
 
         foreach ($connectedRows as $c) {
             $notes = (string) ($c->call_notes ?? '');
@@ -134,14 +136,21 @@ class TelecallerScoreService
                 $notesCount++;
             }
 
-            $changed = (string) ($c->status_changed_to ?? '');
+            $changed = trim((string) ($c->status_changed_to ?? ''));
             if ($changed === 'interested') $leadInterested++;
             if ($changed === 'walkin_done') $leadWalkin++;
             if ($changed === 'admission_done') $leadAdmission++;
             if ($changed === 'not_interested') $leadNotInterested++;
 
             // Outcome quality per connected call.
-            $outcomeScoreSum += $outcomeWeights[$changed] ?? 0.30;
+            // If status_changed_to is missing/empty/unknown, we IGNORE it in outcome averaging
+            // (so the leaderboard % reflects conversions, not incomplete call tagging).
+            if ($changed !== '' && array_key_exists($changed, $outcomeWeights)) {
+                $outcomeScoreSum += $outcomeWeights[$changed];
+                $outcomeScoreCount++;
+            } else {
+                $outcomeIgnoredCount++;
+            }
 
             if (in_array($changed, ['interested', 'follow_up_later'], true)) {
                 $followupRequired++;
@@ -173,7 +182,7 @@ class TelecallerScoreService
         $followupCompliance = (int) round($followupScore * 100);
 
         // Normalized component scores (0..1 except volume).
-        $outcomeScore = $connected > 0 ? min(1.0, max(0.0, $outcomeScoreSum / $connected)) : 0.0;
+        $outcomeScore = $outcomeScoreCount > 0 ? min(1.0, max(0.0, $outcomeScoreSum / $outcomeScoreCount)) : 0.0;
         $notesScore = $notesScoreCount > 0 ? min(1.0, max(0.0, $notesScoreSum / $notesScoreCount)) : 0.0;
 
         // Engagement score: if there are no follow-up-needed outcomes, keep it neutral (1.0),
@@ -197,12 +206,17 @@ class TelecallerScoreService
         // - Engagement minutes (option B): 5
         // - Follow-up compliance: 5
         // - Volume activity nudge: 2 (using un-capped volumeRatio)
+        $outcomePoints = $outcomeScore * 80;
+        $notesPoints = $notesScore * 8;
+        $engagementPoints = $engagementScore * 5;
+        $followupPoints = $followupScore * 5;
+        $volumePoints = $volumeRatio * 2;
         $scoreFloat =
-            ($outcomeScore * 80)
-            + ($notesScore * 8)
-            + ($engagementScore * 5)
-            + ($followupScore * 5)
-            + ($volumeRatio * 2);
+            $outcomePoints
+            + $notesPoints
+            + $engagementPoints
+            + $followupPoints
+            + $volumePoints;
 
         $score = (int) min(100, max(0, round($scoreFloat)));
 
@@ -222,6 +236,20 @@ class TelecallerScoreService
                 'lead_interested' => $leadInterested,
                 'lead_walkin' => $leadWalkin,
                 'lead_admission' => $leadAdmission,
+                'outcome_score' => $outcomeScore,
+                'outcome_score_percent' => (int) round($outcomeScore * 100),
+                'notes_score' => $notesScore,
+                'notes_score_percent' => (int) round($notesScore * 100),
+                'engagement_score' => $engagementScore,
+                'engagement_score_percent' => (int) round($engagementScore * 100),
+                'volume_ratio' => (float) $volumeRatio,
+                'outcome_classified_count' => $outcomeScoreCount,
+                'outcome_ignored_count' => $outcomeIgnoredCount,
+                'outcome_points' => (float) $outcomePoints,
+                'notes_points' => (float) $notesPoints,
+                'engagement_points' => (float) $engagementPoints,
+                'followup_points' => (float) $followupPoints,
+                'volume_points' => (float) $volumePoints,
             ],
         ];
     }
