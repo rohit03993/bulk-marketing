@@ -281,6 +281,17 @@ Route::middleware(['auth', 'verified'])->group(function () {
                 }
 
                 usort($leaderboard, function ($a, $b) {
+                    $admA = (int) ($a['breakdown']['lead_admission'] ?? 0);
+                    $admB = (int) ($b['breakdown']['lead_admission'] ?? 0);
+                    if ($admB !== $admA) {
+                        return $admB <=> $admA;
+                    }
+                    $walkA = (int) ($a['breakdown']['lead_walkin'] ?? 0);
+                    $walkB = (int) ($b['breakdown']['lead_walkin'] ?? 0);
+                    if ($walkB !== $walkA) {
+                        return $walkB <=> $walkA;
+                    }
+
                     return $b['score'] <=> $a['score'];
                 });
             }

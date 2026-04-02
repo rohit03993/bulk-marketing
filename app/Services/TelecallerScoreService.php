@@ -190,19 +190,19 @@ class TelecallerScoreService
         // but final score is still clamped to 100.
         $volumeRatio = $dailyTarget > 0 ? ($total / $dailyTarget) : 0;
 
-        // Final score (0..100).
+        // Final score (0..100). Conversion-dominant: outcome drives rank; other signals are small nudges.
         // Weights:
-        // - Outcome: 50
-        // - Notes: 25
-        // - Engagement minutes (option B): 15
-        // - Follow-up compliance: 7
-        // - Volume activity nudge: 3 (using un-capped volumeRatio)
+        // - Outcome: 80
+        // - Notes: 8
+        // - Engagement minutes (option B): 5
+        // - Follow-up compliance: 5
+        // - Volume activity nudge: 2 (using un-capped volumeRatio)
         $scoreFloat =
-            ($outcomeScore * 50)
-            + ($notesScore * 25)
-            + ($engagementScore * 15)
-            + ($followupScore * 7)
-            + ($volumeRatio * 3);
+            ($outcomeScore * 80)
+            + ($notesScore * 8)
+            + ($engagementScore * 5)
+            + ($followupScore * 5)
+            + ($volumeRatio * 2);
 
         $score = (int) min(100, max(0, round($scoreFloat)));
 
