@@ -199,24 +199,21 @@ class TelecallerScoreService
         // but final score is still clamped to 100.
         $volumeRatio = $dailyTarget > 0 ? ($total / $dailyTarget) : 0;
 
-        // Final score (0..100). Conversion-dominant: outcome drives rank; other signals are small nudges.
-        // Weights:
-        // - Outcome: 80
-        // - Notes: 8
-        // - Engagement minutes (option B): 5
-        // - Follow-up compliance: 5
-        // - Volume activity nudge: 2 (using un-capped volumeRatio)
-        $outcomePoints = $outcomeScore * 80;
-        $notesPoints = $notesScore * 8;
-        $engagementPoints = $engagementScore * 5;
-        $followupPoints = $followupScore * 5;
-        $volumePoints = $volumeRatio * 2;
-        $scoreFloat =
-            $outcomePoints
-            + $notesPoints
-            + $engagementPoints
-            + $followupPoints
-            + $volumePoints;
+        // Final score (0..100) aligned with rank:
+        // Score is driven mainly by total conversions:
+        // - Admission is 1 point
+        // - Walk-in is 1 point
+        // Activity bonus (calls made) is capped to keep conversions as the primary factor.
+        $conversionPoints = $leadAdmission + $leadWalkin;
+        $conversionMaxPoints = max(1, $dailyTarget); // Conversion-only day => 100%
+        $conversionScore = $conversionMaxPoints > 0 ? min(1.0, max(0.0, $conversionPoints / $conversionMaxPoints)) : 0.0;
+
+        // Recognized connected outcomes are used as a proxy for "calls were actually made".
+        // This bonus is intentionally tiny so it cannot override conversion ranking.
+        $activityBonus = $dailyTarget > 0 ? min(1.0, max(0.0, $outcomeScoreCount / max(1, $dailyTarget))) : 0.0; // 0..1
+
+        // Up to 99 points from conversion; up to 1 point from activity.
+        $scoreFloat = ($conversionScore * 99) + ($activityBonus * 1);
 
         $score = (int) min(100, max(0, round($scoreFloat)));
 
@@ -236,6 +233,11 @@ class TelecallerScoreService
                 'lead_interested' => $leadInterested,
                 'lead_walkin' => $leadWalkin,
                 'lead_admission' => $leadAdmission,
+                // Conversion-aligned scoring fields for UI transparency.
+                'conversion_points' => $conversionPoints,
+                'conversion_score_percent' => (int) round($conversionScore * 100),
+                'activity_bonus_percent' => (int) round($activityBonus * 100),
+                // Kept for potential future detailed reporting.
                 'outcome_score' => $outcomeScore,
                 'outcome_score_percent' => (int) round($outcomeScore * 100),
                 'notes_score' => $notesScore,
@@ -245,11 +247,6 @@ class TelecallerScoreService
                 'volume_ratio' => (float) $volumeRatio,
                 'outcome_classified_count' => $outcomeScoreCount,
                 'outcome_ignored_count' => $outcomeIgnoredCount,
-                'outcome_points' => (float) $outcomePoints,
-                'notes_points' => (float) $notesPoints,
-                'engagement_points' => (float) $engagementPoints,
-                'followup_points' => (float) $followupPoints,
-                'volume_points' => (float) $volumePoints,
             ],
         ];
     }

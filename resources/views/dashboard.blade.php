@@ -335,7 +335,7 @@
                                         <th class="px-3 py-2 text-left font-semibold text-slate-500">{{ __('Telecaller') }}</th>
                                         <th class="px-3 py-2 text-left font-semibold text-slate-500">{{ __('Score') }}</th>
                                         <th class="px-3 py-2 text-left font-semibold text-slate-500">{{ __('Calls') }}</th>
-                                        <th class="px-3 py-2 text-left font-semibold text-slate-500">{{ __('Follow-up %') }}</th>
+                                        <th class="px-3 py-2 text-left font-semibold text-slate-500">{{ __('Conversions') }}</th>
                                     </tr>
                                 </thead>
                                 <tbody class="divide-y divide-slate-100">
@@ -355,17 +355,15 @@
                                             </td>
                                             <td class="px-3 py-2 text-slate-800 font-semibold">
                                                 <div class="flex flex-col">
-                                                    <span title="{{ __('Score = (Outcome*80) + (Notes*8) + (Engagement*5) + (Follow-up*5) + (VolumeRatio*2). Outcome/Notes/Engagement are derived from connected calls.') }}">
+                                                    <span title="{{ __('Score = ConversionScore*99 + ActivityBonus*1. ConversionPoints = Adm + Walk-in. ConversionScore = ConversionPoints/daily_target. ActivityBonus = min(1, RecognizedConnectedOutcomes/daily_target).') }}">
                                                         {{ $row['score'] }}%
                                                     </span>
                                                     <span class="text-[11px] text-slate-500 font-normal mt-1 leading-snug">
-                                                        {{ __('Outcome') }}: {{ $b['outcome_score_percent'] ?? 0 }}% ·
-                                                        {{ __('Notes') }}: {{ $b['notes_score_percent'] ?? 0 }}% ·
-                                                        {{ __('Eng.') }}: {{ $b['engagement_score_percent'] ?? 0 }}% ·
-                                                        {{ __('Follow-up') }}: {{ $b['followup_compliance'] ?? 0 }}%<br/>
                                                         {{ __('Adm') }}: {{ $b['lead_admission'] ?? 0 }} ·
-                                                        {{ __('Walk-in') }}: {{ $b['lead_walkin'] ?? 0 }} ·
-                                                        {{ __('Volume') }}: {{ $b['total_calls'] ?? 0 }}/{{ $b['daily_target'] ?? 25 }}
+                                                        {{ __('Walk-in') }}: {{ $b['lead_walkin'] ?? 0 }}<br/>
+                                                        {{ __('ConvPts') }}: {{ $b['conversion_points'] ?? 0 }} ·
+                                                        {{ __('ConvScore') }}: {{ $b['conversion_score_percent'] ?? 0 }}% ·
+                                                        {{ __('Activity') }}: {{ $b['activity_bonus_percent'] ?? 0 }}%
                                                     </span>
                                                 </div>
                                             </td>
@@ -373,7 +371,7 @@
                                                 {{ $b['total_calls'] ?? 0 }}
                                             </td>
                                             <td class="px-3 py-2 text-slate-600">
-                                                {{ $b['followup_compliance'] ?? 0 }}%
+                                                {{ ($b['lead_admission'] ?? 0) }}/{{ ($b['lead_walkin'] ?? 0) }}
                                             </td>
                                         </tr>
                                     @endforeach
@@ -498,7 +496,7 @@
                             <p class="mt-3 text-4xl font-extrabold {{ $colorFor($scoreToday['score'] ?? 0) }}">{{ $scoreToday['score'] ?? 0 }}%</p>
                             <div class="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
                                 <span>{{ __('Calls') }}: <strong class="text-slate-700">{{ $scoreToday['breakdown']['total_calls'] ?? 0 }}/{{ $scoreToday['breakdown']['daily_target'] ?? 25 }}</strong></span>
-                                <span>{{ __('Follow-up') }}: <strong class="text-slate-700">{{ $scoreToday['breakdown']['followup_compliance'] ?? 0 }}%</strong></span>
+                                <span>{{ __('Follow-up due') }}: <strong class="text-slate-700">{{ $scoreToday['breakdown']['pending_followups_due'] ?? 0 }}</strong></span>
                             </div>
                         </div>
                         @if ($scoreOverall && ($scoreOverall['days'] ?? 0) > 0)
