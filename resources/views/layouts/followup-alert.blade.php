@@ -7,10 +7,8 @@
     $endOfToday = $now->copy()->endOfDay();
 
     // Only treat these lead statuses as active follow-ups.
-    $followupLeadStatuses = ['interested', 'follow_up_later'];
-
     $baseFollowupQuery = \App\Models\Student::where('assigned_to', $userId)
-        ->whereIn('lead_status', $followupLeadStatuses)
+        ->whereIn('lead_status', \App\Models\Student::FOLLOWUP_PIPELINE_STATUSES)
         ->whereNotNull('next_followup_at');
 
     $overdueCount = (clone $baseFollowupQuery)

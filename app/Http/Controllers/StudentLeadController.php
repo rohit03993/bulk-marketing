@@ -199,7 +199,7 @@ class StudentLeadController extends Controller
         $upcomingUntil = $endOfToday->copy()->addDays($upcomingDays);
 
         // Only these lead statuses participate in the follow-up loop.
-        $followupLeadStatuses = ['interested', 'follow_up_later'];
+        $followupLeadStatuses = Student::FOLLOWUP_PIPELINE_STATUSES;
 
         $notConnectedStatuses = [
             StudentCall::STATUS_NO_ANSWER,

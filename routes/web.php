@@ -44,7 +44,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
             $page = max(1, $page);
 
             $endOfToday = now()->endOfDay();
-            $dueLeadStatuses = ['interested', 'follow_up_later'];
+            $dueLeadStatuses = \App\Models\Student::FOLLOWUP_PIPELINE_STATUSES;
             $convertedStatuses = ['walkin_done', 'admission_done'];
 
             $hasBlockField = \Illuminate\Support\Facades\Schema::hasColumn('students', 'is_call_blocked');
@@ -366,7 +366,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         $myLeadsQuery = \App\Models\Student::where('assigned_to', $userId);
 
         // Follow-up pool is strictly these lead statuses.
-        $followupLeadStatuses = ['interested', 'follow_up_later'];
+        $followupLeadStatuses = \App\Models\Student::FOLLOWUP_PIPELINE_STATUSES;
 
         $assignedLeads = (clone $myLeadsQuery)->count();
         $leadWalkin = (clone $myLeadsQuery)->where('lead_status', 'walkin_done')->count();
@@ -386,7 +386,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
             'lead_walkin_done' => $leadWalkin,
             'lead_admission_done' => $leadAdmission,
             'lead_not_interested' => $leadNotInterested,
-            // All active follow-ups in the upcoming window (interested / follow_up_later only)
+            // All active follow-ups in the upcoming window (pipeline statuses only)
             'followups_window' => (clone $followupBase)
                 ->where('next_followup_at', '<=', $upcomingUntil)
                 ->count(),
@@ -567,8 +567,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('campaigns/{campaign}', [CampaignController::class, 'show'])->name('campaigns.show');
     });
 
-    Route::get('phone/{phone}/campaigns', [PhoneCampaignsController::class, 'show'])->name('phone.campaigns')->where('phone', '[0-9]{10}');
-    Route::post('phone/{phone}/send-single', [PhoneCampaignsController::class, 'sendSingle'])->name('phone.send-single')->where('phone', '[0-9]{10}');
+    Route::middleware('access:students')->group(function () {
+        Route::get('phone/{phone}/campaigns', [PhoneCampaignsController::class, 'show'])->name('phone.campaigns')->where('phone', '[0-9]{10}');
+        Route::post('phone/{phone}/send-single', [PhoneCampaignsController::class, 'sendSingle'])->name('phone.send-single')->where('phone', '[0-9]{10}');
+    });
 
     // Admin section: full access overview (admin only)
     Route::middleware('admin')->prefix('admin')->name('admin.')->group(function () {
@@ -600,7 +602,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
             $endOfToday = now()->endOfDay();
 
-            $dueLeadStatuses = ['interested', 'follow_up_later'];
+            $dueLeadStatuses = \App\Models\Student::FOLLOWUP_PIPELINE_STATUSES;
             $convertedStatuses = ['walkin_done', 'admission_done'];
 
             $hasBlockField = \Illuminate\Support\Facades\Schema::hasColumn('students', 'is_call_blocked');

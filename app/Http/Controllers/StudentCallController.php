@@ -11,12 +11,13 @@ use App\Models\Student;
 use App\Models\StudentCall;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 
 class StudentCallController extends Controller
 {
     private const LEAD_STATUSES = ['lead', 'interested', 'not_interested', 'walkin_done', 'admission_done', 'follow_up_later'];
 
-    private const FOLLOWUP_LEAD_STATUSES = ['interested', 'follow_up_later'];
+    private const FOLLOWUP_LEAD_STATUSES = Student::FOLLOWUP_PIPELINE_STATUSES;
 
     private const TERMINAL_LEAD_STATUSES = ['not_interested', 'admission_done'];
 
@@ -28,6 +29,13 @@ class StudentCallController extends Controller
      */
     public function store(Request $request, Student $student)
     {
+        $user = $request->user();
+        // Telecaller can log calls only for currently-assigned leads.
+        // Admin can log for any student.
+        if (! $user?->isAdmin() && (int) ($student->assigned_to ?? 0) !== (int) $user?->id) {
+            abort(403, __('Access denied.'));
+        }
+
         $callDirection = $request->input('call_direction', 'outgoing');
         if (! in_array($callDirection, ['outgoing', 'incoming'], true)) {
             $callDirection = 'outgoing';
@@ -82,69 +90,96 @@ class StudentCallController extends Controller
             $newLeadStatus = $data['lead_status'] ?? null;
         }
 
-        $user = $request->user();
+        $call = null;
+        $studentAfter = null;
+        $shouldSendPostCallWhatsapp = false;
 
-        $call = new StudentCall();
-        $call->student_id = $student->id;
-        $call->user_id = $user->id;
-        $call->call_status = $callStatus;
-        $call->call_direction = $callDirection;
-        $call->duration_minutes = (int) ($data['duration_minutes'] ?? 0);
-        $call->call_notes = $data['call_notes'] ?? null;
-        $call->status_changed_to = $newLeadStatus;
-        if ($wizard && $request->boolean('call_connected')) {
-            $call->who_answered = $data['who_answered'];
-            $call->tags = $request->input('tags', []);
-        }
-        $call->called_at = Carbon::now();
-
-        // Decide next follow-up based on smarter rules.
-        $call->next_followup_at = $this->determineNextFollowupAt(
+        DB::transaction(function () use (
             $student,
             $user,
             $callStatus,
+            $callDirection,
             $newLeadStatus,
             $data,
-            $wizard
-        );
+            $wizard,
+            $request,
+            &$call,
+            &$studentAfter,
+            &$shouldSendPostCallWhatsapp
+        ) {
+            // Lock the target student row so simultaneous submissions cannot corrupt counters/follow-ups.
+            $lockedStudent = Student::whereKey($student->id)->lockForUpdate()->firstOrFail();
 
-        $call->save();
-
-        $student->total_calls = (int) $student->total_calls + 1;
-        $student->last_call_at = $call->called_at;
-        $student->last_call_status = $call->call_status;
-        // Preserve previous notes if this call has no notes, so important history is not lost.
-        $student->last_call_notes = $call->call_notes !== null && trim($call->call_notes) !== ''
-            ? $call->call_notes
-            : $student->last_call_notes;
-        $student->next_followup_at = $call->next_followup_at;
-        if ($newLeadStatus) {
-            $student->lead_status = $newLeadStatus;
-        }
-        if ($newLeadStatus === 'not_interested') {
-            $student->next_followup_at = null;
-            $this->applyPermanentBlock($student, 'not_interested');
-        } elseif ($newLeadStatus === 'admission_done') {
-            $student->next_followup_at = null;
-        }
-        if (in_array($callStatus, StudentCall::notConnectedStatuses(), true)) {
-            $failedAttemptsTotal = StudentCall::where('student_id', $student->id)
-                ->whereIn('call_status', StudentCall::notConnectedStatuses())
-                ->count();
-            if ($failedAttemptsTotal >= self::MAX_NOT_CONNECTED_ATTEMPTS) {
-                $student->next_followup_at = null;
-                $this->applyPermanentBlock($student, 'max_not_connected_attempts');
+            // Re-check assignment inside lock to ensure redistribution is respected immediately.
+            if (! $user?->isAdmin() && (int) ($lockedStudent->assigned_to ?? 0) !== (int) $user->id) {
+                abort(403, __('Access denied.'));
             }
-        }
-        if (! $student->assigned_to) {
-            $student->assigned_to = $user->id;
-            $student->assigned_by = $user->id;
-            $student->assigned_at = Carbon::now();
-        }
-        $student->save();
 
-        if ($callDirection === 'outgoing' && $callStatus === StudentCall::STATUS_CONNECTED) {
-            $this->firePostCallWhatsApp($call, $student, $user);
+            $call = new StudentCall();
+            $call->student_id = $lockedStudent->id;
+            $call->user_id = $user->id;
+            $call->call_status = $callStatus;
+            $call->call_direction = $callDirection;
+            $call->duration_minutes = (int) ($data['duration_minutes'] ?? 0);
+            $call->call_notes = $data['call_notes'] ?? null;
+            $call->status_changed_to = $newLeadStatus;
+            if ($wizard && $request->boolean('call_connected')) {
+                $call->who_answered = $data['who_answered'];
+                $call->tags = $request->input('tags', []);
+            }
+            $call->called_at = Carbon::now();
+
+            // Decide next follow-up based on existing business rules.
+            $call->next_followup_at = $this->determineNextFollowupAt(
+                $lockedStudent,
+                $user,
+                $callStatus,
+                $newLeadStatus,
+                $data,
+                $wizard
+            );
+
+            $call->save();
+
+            $lockedStudent->total_calls = (int) $lockedStudent->total_calls + 1;
+            $lockedStudent->last_call_at = $call->called_at;
+            $lockedStudent->last_call_status = $call->call_status;
+            // Preserve previous notes if this call has no notes, so important history is not lost.
+            $lockedStudent->last_call_notes = $call->call_notes !== null && trim($call->call_notes) !== ''
+                ? $call->call_notes
+                : $lockedStudent->last_call_notes;
+            $lockedStudent->next_followup_at = $call->next_followup_at;
+            if ($newLeadStatus) {
+                $lockedStudent->lead_status = $newLeadStatus;
+            }
+            if ($newLeadStatus === 'not_interested') {
+                $lockedStudent->next_followup_at = null;
+                $this->applyPermanentBlock($lockedStudent, 'not_interested');
+            } elseif ($newLeadStatus === 'admission_done') {
+                $lockedStudent->next_followup_at = null;
+            }
+            if (in_array($callStatus, StudentCall::notConnectedStatuses(), true)) {
+                $failedAttemptsTotal = StudentCall::where('student_id', $lockedStudent->id)
+                    ->whereIn('call_status', StudentCall::notConnectedStatuses())
+                    ->count();
+                if ($failedAttemptsTotal >= self::MAX_NOT_CONNECTED_ATTEMPTS) {
+                    $lockedStudent->next_followup_at = null;
+                    $this->applyPermanentBlock($lockedStudent, 'max_not_connected_attempts');
+                }
+            }
+            if (! $lockedStudent->assigned_to) {
+                $lockedStudent->assigned_to = $user->id;
+                $lockedStudent->assigned_by = $user->id;
+                $lockedStudent->assigned_at = Carbon::now();
+            }
+            $lockedStudent->save();
+
+            $studentAfter = $lockedStudent;
+            $shouldSendPostCallWhatsapp = $callDirection === 'outgoing' && $callStatus === StudentCall::STATUS_CONNECTED;
+        });
+
+        if ($shouldSendPostCallWhatsapp && $call && $studentAfter) {
+            $this->firePostCallWhatsApp($call, $studentAfter, $user);
         }
 
         if ($request->ajax() || $request->wantsJson()) {
@@ -166,7 +201,7 @@ class StudentCallController extends Controller
         $connected = $request->boolean('call_connected');
         $now = Carbon::now();
 
-        if ($connected && in_array($leadStatus, ['interested', 'follow_up_later'], true)) {
+        if ($connected && in_array($leadStatus, Student::FOLLOWUP_PIPELINE_STATUSES, true)) {
             $suggested = $now->copy()->addDays(2)->setHour(10)->setMinute(0)->setSecond(0);
         } elseif (! $connected) {
             $suggested = $now->copy()->addHours(2)->minute(0)->second(0);
@@ -195,7 +230,7 @@ class StudentCallController extends Controller
      * Decide the next_followup_at for a new call, without changing existing data.
      *
      * Rules:
-     * - Only leads in FOLLOWUP_LEAD_STATUSES get a future follow-up.
+     * - Only leads in FOLLOWUP_LEAD_STATUSES (interested, follow_up_later, walkin_done) get a future follow-up.
      * - Terminal lead statuses never get a follow-up.
      * - Not-connected calls schedule follow-up only up to MAX_NOT_CONNECTED_ATTEMPTS
      *   for this student (permanent cap).
@@ -215,7 +250,7 @@ class StudentCallController extends Controller
             return null;
         }
 
-        // Connected + interested / follow_up_later: honour provided follow-up.
+        // Connected + pipeline statuses: honour provided follow-up.
         if ($callStatus === StudentCall::STATUS_CONNECTED && $newLeadStatus && in_array($newLeadStatus, self::FOLLOWUP_LEAD_STATUSES, true)) {
             if (! empty($data['next_followup_at'])) {
                 return Carbon::parse($data['next_followup_at']);

@@ -152,7 +152,7 @@ class TelecallerScoreService
                 $outcomeIgnoredCount++;
             }
 
-            if (in_array($changed, ['interested', 'follow_up_later'], true)) {
+            if (in_array($changed, Student::FOLLOWUP_PIPELINE_STATUSES, true)) {
                 $followupRequired++;
                 if (! empty($c->next_followup_at)) $followupDone++;
             }
@@ -165,7 +165,7 @@ class TelecallerScoreService
 
             // Engagement scoring option B:
             // Minutes count ONLY when the connected outcome is one that needs follow-up.
-            if (in_array($changed, ['interested', 'follow_up_later'], true)) {
+            if (in_array($changed, Student::FOLLOWUP_PIPELINE_STATUSES, true)) {
                 $minutes = (int) ($c->duration_minutes ?? 0);
                 // 10 minutes or more = full score, diminishing after that.
                 $engagementScoreSum += min(1.0, max(0, $minutes) / 10);
@@ -257,7 +257,7 @@ class TelecallerScoreService
         // next_followup_at is set and is due/overdue up to the given $asOf.
         $q = Student::query()
             ->where('assigned_to', $userId)
-            ->whereIn('lead_status', ['interested', 'follow_up_later'])
+            ->whereIn('lead_status', Student::FOLLOWUP_PIPELINE_STATUSES)
             ->whereNotNull('next_followup_at')
             ->where('next_followup_at', '<=', $asOf->copy()->endOfDay());
 

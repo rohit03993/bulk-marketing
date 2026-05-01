@@ -55,7 +55,7 @@
                         <div class="px-5 py-4 border-b border-slate-100 flex items-start justify-between gap-4">
                             <div>
                                 <p class="text-sm font-semibold text-slate-900">{{ __('School -> Class snapshot') }}</p>
-                                <p class="mt-0.5 text-xs text-slate-500">{{ __('Converted = walk-in done + admission done. Follow-ups due are interested/follow-up-later with next_followup_at <= today.') }}</p>
+                                <p class="mt-0.5 text-xs text-slate-500">{{ __('Converted = walk-in done + admission done. Follow-ups due are interested, follow-up-later, or walk-in done with next_followup_at <= today.') }}</p>
                             </div>
                             <div class="hidden sm:block text-xs text-slate-500">
                                 {{ __('Expanded to view classes') }}

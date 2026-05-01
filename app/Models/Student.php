@@ -11,6 +11,12 @@ class Student extends Model
     use HasFactory;
     use SoftDeletes;
 
+    /**
+     * Lead statuses included in follow-up queue, KPI "follow-ups due", and reminder bar.
+     * Walk-in done still needs post-visit follow-up calls until admission or drop-off.
+     */
+    public const FOLLOWUP_PIPELINE_STATUSES = ['interested', 'follow_up_later', 'walkin_done'];
+
     protected $fillable = [
         'class_section_id',
         'name',
