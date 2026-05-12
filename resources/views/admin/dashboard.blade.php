@@ -15,6 +15,9 @@
                 <a href="{{ route('admin.settings.postcall-whatsapp') }}" class="inline-flex items-center px-3 py-2 rounded-lg text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 transition border border-slate-200">
                     {{ __('Auto WhatsApp') }}
                 </a>
+                <a href="{{ route('admin.reset-data') }}" class="inline-flex items-center px-3 py-2 rounded-lg text-xs font-semibold text-red-800 bg-red-50 hover:bg-red-100 transition border border-red-200">
+                    {{ __('Delete CRM data') }}
+                </a>
                 <a href="{{ route('dashboard') }}" class="inline-flex items-center px-3 py-2 rounded-lg text-xs font-semibold text-slate-500 bg-white hover:bg-slate-50 transition border border-slate-200">
                     ← {{ __('Back') }}
                 </a>

@@ -24,6 +24,7 @@
                         <li>{{ __('Campaigns') }} ({{ number_format($counts['campaigns']) }})</li>
                         <li>{{ __('Student imports') }} ({{ number_format($counts['imports']) }})</li>
                         <li>{{ __('Lead / call history') }} ({{ number_format($counts['student_calls']) }})</li>
+                        <li>{{ __('Assignment transfers') }} ({{ number_format($counts['assignment_transfers'] ?? 0) }})</li>
                         <li>{{ __('Tags & lists') }} ({{ number_format($counts['tags']) }})</li>
                         <li>{{ __('Staff user accounts') }} ({{ number_format($counts['staff_users']) }})</li>
                     </ul>
@@ -33,10 +34,10 @@
                         <div>
                             <label for="scope" class="block text-sm font-medium text-slate-700">{{ __('Delete scope') }}</label>
                             <select id="scope" name="scope" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 text-sm">
-                                <option value="students" {{ old('scope', 'students') === 'students' ? 'selected' : '' }}>{{ __('Selected students (by ID) + their history') }}</option>
-                                <option value="class_section" {{ old('scope') === 'class_section' ? 'selected' : '' }}>{{ __('Selected class/section + all students/history inside') }}</option>
-                                <option value="school" {{ old('scope') === 'school' ? 'selected' : '' }}>{{ __('Selected school + all classes/students/history inside') }}</option>
-                                <option value="all" {{ old('scope') === 'all' ? 'selected' : '' }}>{{ __('Reset ALL CRM data') }}</option>
+                                <option value="all" {{ old('scope') === 'all' ? 'selected' : '' }}>{{ __('Everything — schools, sessions, classes, students, campaigns, imports, staff logins') }}</option>
+                                <option value="school" {{ old('scope') === 'school' ? 'selected' : '' }}>{{ __('Selected school(s) only + classes/students/history inside') }}</option>
+                                <option value="class_section" {{ old('scope') === 'class_section' ? 'selected' : '' }}>{{ __('Selected class/section(s) only + students/history inside') }}</option>
+                                <option value="students" {{ old('scope', 'students') === 'students' ? 'selected' : '' }}>{{ __('Selected students only (by ID) + their history') }}</option>
                             </select>
                             @error('scope')
                                 <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
@@ -107,8 +108,8 @@
                         </div>
 
                         <div class="flex gap-3 pt-2">
-                            <button type="submit" class="px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-md hover:bg-red-700 focus:ring-2 focus:ring-red-500 focus:ring-offset-2">
-                                {{ __('Delete all data') }}
+                            <button type="submit" id="submitDelete" class="px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-md hover:bg-red-700 focus:ring-2 focus:ring-red-500 focus:ring-offset-2">
+                                {{ __('Run deletion') }}
                             </button>
                             <a href="{{ route('admin.dashboard') }}" class="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
                                 {{ __('Cancel') }}
@@ -127,11 +128,18 @@
         const classBlock = document.getElementById('classBlock');
         const schoolBlock = document.getElementById('schoolBlock');
 
+        const submitBtn = document.getElementById('submitDelete');
+
         function syncScopeBlocks() {
             const scope = scopeEl?.value || 'students';
             studentsBlock?.classList.toggle('hidden', scope !== 'students');
             classBlock?.classList.toggle('hidden', scope !== 'class_section');
             schoolBlock?.classList.toggle('hidden', scope !== 'school');
+            if (submitBtn) {
+                submitBtn.textContent = scope === 'all'
+                    ? {{ json_encode(__('Delete everything listed above')) }}
+                    : {{ json_encode(__('Run deletion')) }};
+            }
         }
 
         scopeEl?.addEventListener('change', syncScopeBlocks);

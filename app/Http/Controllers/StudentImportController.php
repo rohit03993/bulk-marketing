@@ -176,6 +176,7 @@ class StudentImportController extends Controller
 
         $processed = 0;
         $existingTagged = 0;
+        $existingUpdated = 0;
         $skippedRows = [];
         $policy = $studentImport->duplicate_phone_policy ?? 'skip';
 
@@ -240,21 +241,50 @@ class StudentImportController extends Controller
             if ($existingByPhone) {
                 $student = $existingByPhone;
 
-                // Do NOT move the student between entities/classes or create duplicates.
-                // Optionally update missing secondary phone, but keep existing class_section_id and details.
-                $changes = [];
-                if ($secondaryNormalized && ! $student->whatsapp_phone_secondary) {
-                    $changes['whatsapp_phone_secondary'] = $secondaryNormalized;
-                }
-                if (! empty($changes)) {
-                    $student->update($changes);
-                }
-
                 if ($tag) {
                     $student->tags()->syncWithoutDetaching([$tag->id]);
                 }
 
-                $existingTagged++;
+                if ($policy === 'overwrite') {
+                    $targetClassSection = ClassSection::firstOrCreate(
+                        [
+                            'school_id' => $schoolId,
+                            'academic_session_id' => $sessionId,
+                            'class_name' => $className,
+                            'section_name' => $sectionName,
+                        ],
+                        []
+                    );
+
+                    $changes = [];
+                    if (isset($data['name']) && trim((string) $data['name']) !== '') {
+                        $changes['name'] = trim((string) $data['name']);
+                    }
+                    if (array_key_exists('father_name', $data)) {
+                        $changes['father_name'] = trim((string) ($data['father_name'] ?? '')) ?: null;
+                    }
+                    if (array_key_exists('roll_number', $data)) {
+                        $changes['roll_number'] = trim((string) ($data['roll_number'] ?? '')) ?: null;
+                    }
+                    if (array_key_exists('admission_number', $data)) {
+                        $changes['admission_number'] = trim((string) ($data['admission_number'] ?? '')) ?: null;
+                    }
+                    if ($primaryNormalized) {
+                        $changes['whatsapp_phone_primary'] = $primaryNormalized;
+                    }
+                    if ($secondaryNormalized !== null) {
+                        $changes['whatsapp_phone_secondary'] = $secondaryNormalized;
+                    }
+                    $changes['class_section_id'] = (int) $targetClassSection->id;
+
+                    if (! empty($changes)) {
+                        $student->update($changes);
+                    }
+                    $existingUpdated++;
+                } else {
+                    // Policy = skip: keep existing student data as-is; only tag (already done above).
+                    $existingTagged++;
+                }
                 $processed++;
                 continue;
             }
@@ -304,6 +334,9 @@ class StudentImportController extends Controller
         ]);
         if ($existingTagged > 0) {
             $message .= ' '.__(':count existing student(s) matched by phone and tagged (no duplicate created).', ['count' => $existingTagged]);
+        }
+        if ($existingUpdated > 0) {
+            $message .= ' '.__(':count existing student(s) matched by phone and updated per overwrite policy.', ['count' => $existingUpdated]);
         }
         if ($skipped > 0) {
             $message .= ' '.__(':count row(s) could not be imported.', ['count' => $skipped]);

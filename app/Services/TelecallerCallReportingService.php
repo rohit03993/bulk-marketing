@@ -101,6 +101,9 @@ class TelecallerCallReportingService
 
         $from = $from->copy()->setTimezone('Asia/Kolkata')->startOfDay();
         $to = $to->copy()->setTimezone('Asia/Kolkata')->endOfDay();
+        // DB timestamps are typically UTC; convert IST day-range to UTC for accurate filtering.
+        $fromUtc = $from->copy()->setTimezone('UTC');
+        $toUtc = $to->copy()->setTimezone('UTC');
 
         $scTable = (new StudentCall())->getTable(); // student_calls
 
@@ -116,15 +119,16 @@ class TelecallerCallReportingService
             ->join('students as st', 'st.id', '=', 'sc.student_id')
             ->join('class_sections as cs', 'cs.id', '=', 'st.class_section_id')
             ->whereIn('sc.user_id', array_map('intval', $telecallerIds))
-            ->whereBetween('sc.called_at', [$from, $to])
+            ->whereBetween('sc.called_at', [$fromUtc, $toUtc])
             ->where('cs.academic_session_id', '=', $sessionId)
             ->whereNull('st.deleted_at')
-            ->selectRaw('DATE(sc.called_at) as called_date')
+            // Group by IST day (UTC + 5h30m) for consistent daily reporting.
+            ->selectRaw("DATE(sc.called_at + INTERVAL 330 MINUTE) as called_date")
             ->selectRaw('sc.user_id as telecaller_id')
             ->selectRaw('sum(case when sc.id = f.first_call_id then 1 else 0 end) as new_calls')
             ->selectRaw('sum(case when sc.id <> f.first_call_id then 1 else 0 end) as followup_calls')
             ->selectRaw('count(*) as total_calls')
-            ->groupBy(DB::raw('DATE(sc.called_at)'), 'sc.user_id')
+            ->groupBy(DB::raw("DATE(sc.called_at + INTERVAL 330 MINUTE)"), 'sc.user_id')
             ->get();
 
         $out = [];

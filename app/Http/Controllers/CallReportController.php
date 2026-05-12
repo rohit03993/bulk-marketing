@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\AcademicSession;
 use App\Models\StudentCall;
 use App\Models\User;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -18,6 +19,15 @@ class CallReportController extends Controller
         // Default: last 7 days (inclusive)
         $from = $request->input('from') ?: now()->subDays(6)->toDateString();
         $to = $request->input('to') ?: now()->toDateString();
+        $fromIst = Carbon::parse($from, 'Asia/Kolkata')->startOfDay();
+        $toIst = Carbon::parse($to, 'Asia/Kolkata')->endOfDay();
+        if ($fromIst->gt($toIst)) {
+            [$fromIst, $toIst] = [$toIst->copy()->startOfDay(), $fromIst->copy()->endOfDay()];
+            $from = $fromIst->toDateString();
+            $to = $toIst->toDateString();
+        }
+        $fromUtc = $fromIst->copy()->setTimezone('UTC')->toDateTimeString();
+        $toUtc = $toIst->copy()->setTimezone('UTC')->toDateTimeString();
 
         $connection = $request->input('connection', 'all'); // all|connected|not_connected
         $reason = $request->input('reason'); // specific not-connected status
@@ -47,10 +57,7 @@ class CallReportController extends Controller
         $query = StudentCall::query()
             ->with(['student.classSection.school', 'user'])
             ->where('user_id', $effectiveUserId)
-            ->whereBetween('called_at', [
-                $from.' 00:00:00',
-                $to.' 23:59:59',
-            ])
+            ->whereBetween('called_at', [$fromUtc, $toUtc])
             ->orderByDesc('called_at');
 
         if ($reportSessionId > 0) {
@@ -106,10 +113,7 @@ class CallReportController extends Controller
             ->join('students as st', 'st.id', '=', 'sc.student_id')
             ->join('class_sections as cs', 'cs.id', '=', 'st.class_section_id')
             ->where('sc.user_id', $effectiveUserId)
-            ->whereBetween('sc.called_at', [
-                $from.' 00:00:00',
-                $to.' 23:59:59',
-            ])
+            ->whereBetween('sc.called_at', [$fromUtc, $toUtc])
             ->whereNull('st.deleted_at');
 
         if ($reportSessionId > 0) {

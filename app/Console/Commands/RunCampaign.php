@@ -11,6 +11,7 @@ use App\Models\User;
 use App\Services\AisensyService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 
 class RunCampaign extends Command
 {
@@ -78,10 +79,9 @@ class RunCampaign extends Command
 
         $shotByUser = $campaign->shot_by ? User::find($campaign->shot_by) : null;
 
-        $pending = CampaignRecipient::where('campaign_id', $campaign->id)
-            ->where('status', 'pending')
-            ->limit($batchSize)
-            ->cursor();
+        // Claim a batch atomically to prevent duplicate sends when workers overlap.
+        $claimedRecipientIds = $this->claimBatchRecipientIds($campaign->id, $batchSize);
+        $pending = CampaignRecipient::whereIn('id', $claimedRecipientIds)->cursor();
 
         $sent = 0;
         $failed = 0;
@@ -107,7 +107,15 @@ class RunCampaign extends Command
                 $templateParams[] = $this->resolveParamSource($source, $student, $classSection, $school, $session, $shotByUser);
             }
 
-            $result = $aisensy->send($recipient->phone, $templateParams, $template->name, $campaignMedia);
+            try {
+                $result = $aisensy->send($recipient->phone, $templateParams, $template->name, $campaignMedia);
+            } catch (\Throwable $e) {
+                $result = [
+                    'status' => 'failed',
+                    'response' => null,
+                    'error' => $e->getMessage(),
+                ];
+            }
 
             $recipient->template_params = $templateParams;
             $recipient->message_sent = $this->buildMessageSent($template->body, $templateParams);
@@ -140,8 +148,9 @@ class RunCampaign extends Command
         $failedCount = CampaignRecipient::where('campaign_id', $campaign->id)->where('status', 'failed')->count();
         $campaign->update(['sent_count' => $sentCount, 'failed_count' => $failedCount]);
 
+        // Keep campaign running if any worker still has claimed "processing" recipients.
         $remaining = CampaignRecipient::where('campaign_id', $campaign->id)
-            ->where('status', 'pending')
+            ->whereIn('status', ['pending', 'processing'])
             ->count();
 
         if ($remaining === 0) {
@@ -247,6 +256,35 @@ class RunCampaign extends Command
             'caller.phone' => (string) ($shotByUser?->phone ?? ''),
             default => '',
         };
+    }
+
+    /**
+     * Claim a recipient batch in one transaction to avoid overlap duplicates.
+     */
+    protected function claimBatchRecipientIds(int $campaignId, int $batchSize): array
+    {
+        // Recover stale processing rows (e.g. worker crash) so queue does not get stuck.
+        // 15 minutes is safe with current job timeout defaults.
+        CampaignRecipient::where('campaign_id', $campaignId)
+            ->where('status', 'processing')
+            ->where('updated_at', '<', now()->subMinutes(15))
+            ->update(['status' => 'pending']);
+
+        return DB::transaction(function () use ($campaignId, $batchSize) {
+            $ids = CampaignRecipient::where('campaign_id', $campaignId)
+                ->where('status', 'pending')
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->limit($batchSize)
+                ->pluck('id')
+                ->all();
+
+            if (! empty($ids)) {
+                CampaignRecipient::whereIn('id', $ids)->update(['status' => 'processing']);
+            }
+
+            return $ids;
+        });
     }
 }
 

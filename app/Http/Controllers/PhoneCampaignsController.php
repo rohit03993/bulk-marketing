@@ -18,14 +18,23 @@ class PhoneCampaignsController extends Controller
      */
     public function show(string $phone)
     {
+        $user = request()->user();
+
+        // Telecaller must only view phones of students currently assigned to them.
+        // Admin can view all.
+        $student = Student::findByPhone($phone);
+        if (! $user?->isAdmin()) {
+            if (! $student || (int) ($student->assigned_to ?? 0) !== (int) $user->id) {
+                abort(403, __('Access denied.'));
+            }
+        }
+
         $recipients = CampaignRecipient::where('phone', $phone)
             ->with(['campaign.template', 'student'])
             ->orderByDesc('created_at')
             ->paginate(20);
 
         $displayPhone = \App\Models\Student::formatPhoneForDisplay($phone);
-
-        $student = Student::findByPhone($phone);
         if ($student) {
             $student->load('tags');
         }
@@ -52,6 +61,11 @@ class PhoneCampaignsController extends Controller
         $student = Student::findByPhone($phone);
         if (! $student) {
             return back()->with('error', __('No student found for this phone number.'));
+        }
+
+        // Telecaller must only send for phones of currently-assigned students.
+        if (! $request->user()?->isAdmin() && (int) ($student->assigned_to ?? 0) !== (int) $request->user()?->id) {
+            abort(403, __('Access denied.'));
         }
 
         $classSection = $student->classSection;

@@ -5,21 +5,25 @@ namespace App\Http\Controllers;
 use App\Models\AcademicSession;
 use App\Models\AisensyTemplate;
 use App\Models\Campaign;
-use App\Models\CampaignRecipient;
 use App\Models\ClassSection;
 use App\Models\School;
 use App\Models\Student;
+use App\Models\StudentAssignmentTransfer;
 use App\Models\StudentCall;
 use App\Models\StudentImport;
-use App\Models\StudentImportColumn;
 use App\Models\Tag;
 use App\Models\User;
+use App\Services\CrmDataResetService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
 class DataResetController extends Controller
 {
+    public function __construct(
+        private readonly CrmDataResetService $crmDataReset
+    ) {}
+
     /**
      * Show the confirmation form for resetting all CRM data.
      * Does not touch: users, sessions, settings.
@@ -35,6 +39,7 @@ class DataResetController extends Controller
             'campaigns' => Campaign::count(),
             'imports' => StudentImport::count(),
             'student_calls' => StudentCall::count(),
+            'assignment_transfers' => StudentAssignmentTransfer::count(),
             'tags' => Tag::count(),
             'staff_users' => User::where('is_admin', false)->count(),
         ];
@@ -89,32 +94,11 @@ class DataResetController extends Controller
             return back()->withErrors(['student_ids' => __('Enter at least one valid student ID.')])->withInput();
         }
 
-        DB::transaction(function () use ($scope, $schoolIds, $classSectionIds, $studentIds) {
+        $actingUserId = (int) $request->user()->id;
+
+        DB::transaction(function () use ($scope, $schoolIds, $classSectionIds, $studentIds, $actingUserId) {
             if ($scope === 'all') {
-                // Core CRM data
-                CampaignRecipient::query()->delete();
-                Campaign::query()->delete();
-                StudentCall::query()->delete();
-                Student::withTrashed()->forceDelete();
-                StudentImportColumn::query()->delete();
-                StudentImport::query()->delete();
-                ClassSection::query()->delete();
-                AcademicSession::query()->delete();
-                School::query()->delete();
-                AisensyTemplate::query()->delete();
-                Tag::query()->delete();
-                DB::table('student_tag')->delete();
-
-                // Background jobs / queue state
-                if (DB::getSchemaBuilder()->hasTable('jobs')) {
-                    DB::table('jobs')->delete();
-                }
-                if (DB::getSchemaBuilder()->hasTable('failed_jobs')) {
-                    DB::table('failed_jobs')->delete();
-                }
-
-                // Remove all non-admin users (staff accounts), keep admins
-                User::where('is_admin', false)->delete();
+                $this->crmDataReset->wipeAll($actingUserId);
 
                 return;
             }
@@ -122,7 +106,7 @@ class DataResetController extends Controller
             if ($scope === 'school') {
                 $classIds = ClassSection::whereIn('school_id', $schoolIds)->pluck('id');
                 $studentIdsForScope = Student::withTrashed()->whereIn('class_section_id', $classIds)->pluck('id');
-                $this->deleteStudentsAndHistory($studentIdsForScope);
+                $this->crmDataReset->deleteStudentsAndHistory($studentIdsForScope);
 
                 ClassSection::whereIn('id', $classIds)->delete();
                 StudentImport::whereIn('school_id', $schoolIds)->delete();
@@ -133,15 +117,14 @@ class DataResetController extends Controller
 
             if ($scope === 'class_section') {
                 $studentIdsForScope = Student::withTrashed()->whereIn('class_section_id', $classSectionIds)->pluck('id');
-                $this->deleteStudentsAndHistory($studentIdsForScope);
+                $this->crmDataReset->deleteStudentsAndHistory($studentIdsForScope);
                 ClassSection::whereIn('id', $classSectionIds)->delete();
 
                 return;
             }
 
-            // scope === 'students'
             $validStudentIds = Student::withTrashed()->whereIn('id', $studentIds)->pluck('id');
-            $this->deleteStudentsAndHistory($validStudentIds);
+            $this->crmDataReset->deleteStudentsAndHistory($validStudentIds);
         });
 
         $message = match ($scope) {
@@ -152,27 +135,5 @@ class DataResetController extends Controller
         };
 
         return redirect()->route('admin.dashboard')->with('success', $message);
-    }
-
-    /**
-     * Delete students and their related history records.
-     */
-    private function deleteStudentsAndHistory($studentIds): void
-    {
-        $studentIds = collect($studentIds)->map(fn ($id) => (int) $id)->filter()->unique()->values();
-        if ($studentIds->isEmpty()) {
-            return;
-        }
-
-        $callIds = StudentCall::whereIn('student_id', $studentIds)->pluck('id');
-
-        if ($callIds->isNotEmpty()) {
-            CampaignRecipient::whereIn('student_call_id', $callIds)->delete();
-            StudentCall::whereIn('id', $callIds)->delete();
-        }
-
-        CampaignRecipient::whereIn('student_id', $studentIds)->delete();
-        DB::table('student_tag')->whereIn('student_id', $studentIds)->delete();
-        Student::withTrashed()->whereIn('id', $studentIds)->forceDelete();
     }
 }

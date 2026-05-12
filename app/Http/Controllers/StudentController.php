@@ -233,6 +233,11 @@ class StudentController extends Controller
 
     public function updateLeadStatus(Request $request, Student $student)
     {
+        // Telecaller can update only currently-assigned leads (admins can update all).
+        if (! $request->user()?->isAdmin() && (int) ($student->assigned_to ?? 0) !== (int) $request->user()?->id) {
+            abort(403, __('Access denied.'));
+        }
+
         $data = $request->validate([
             'lead_status' => 'required|in:lead,interested,not_interested,walkin_done,admission_done,follow_up_later',
         ]);
@@ -244,6 +249,11 @@ class StudentController extends Controller
 
     public function show(Request $request, Student $student)
     {
+        // Telecaller can view only currently-assigned leads (admins can view all).
+        if (! $request->user()?->isAdmin() && (int) ($student->assigned_to ?? 0) !== (int) $request->user()?->id) {
+            abort(403, __('Access denied.'));
+        }
+
         $student->load([
             'classSection.school',
             'classSection.academicSession',
@@ -263,10 +273,19 @@ class StudentController extends Controller
             ->with(['campaign.school', 'campaign.template', 'campaign.shotByUser'])
             ->orderByDesc('created_at');
 
-        $recipientsQuery->where('student_id', $student->id);
-        if (! empty($phones)) {
-            $recipientsQuery->orWhereIn('phone', $phones);
-        }
+        // Safety: keep recipient history scoped to THIS student.
+        // If some historical rows have `student_id = null`, allow showing them only
+        // when the phone matches, to avoid leaking other students' data.
+        $recipientsQuery->where(function ($q) use ($student, $phones) {
+            $q->where('student_id', $student->id);
+
+            if (! empty($phones)) {
+                $q->orWhere(function ($q2) use ($phones) {
+                    $q2->whereNull('student_id')
+                        ->whereIn('phone', $phones);
+                });
+            }
+        });
 
         $messages = $recipientsQuery->limit(100)->get();
 
@@ -282,6 +301,11 @@ class StudentController extends Controller
 
     public function sendSingleMessage(Request $request, Student $student)
     {
+        // Telecaller can send only for currently-assigned leads (admins can send for all).
+        if (! $request->user()?->isAdmin() && (int) ($student->assigned_to ?? 0) !== (int) $request->user()?->id) {
+            abort(403, __('Access denied.'));
+        }
+
         $data = $request->validate([
             'aisensy_template_id' => 'required|exists:aisensy_templates,id',
             'phone' => 'required|string',
