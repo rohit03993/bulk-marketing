@@ -61,6 +61,67 @@ class CrmDataResetService
     }
 
     /**
+     * Students in the given schools that block full-school deletion:
+     * assigned to a staff member and have at least one logged call.
+     *
+     * @param  Collection<int,int>|array<int,int>  $schoolIds
+     * @return Collection<int, Student>
+     */
+    public function assignedCalledStudentsInSchools(Collection|array $schoolIds): Collection
+    {
+        $schoolIds = collect($schoolIds)->map(fn ($id) => (int) $id)->filter()->unique()->values();
+        if ($schoolIds->isEmpty()) {
+            return collect();
+        }
+
+        $classIds = ClassSection::whereIn('school_id', $schoolIds)->pluck('id');
+        if ($classIds->isEmpty()) {
+            return collect();
+        }
+
+        return Student::withTrashed()
+            ->whereIn('class_section_id', $classIds)
+            ->whereNotNull('assigned_to')
+            ->where(function ($query) {
+                $query->where('total_calls', '>', 0)
+                    ->orWhereHas('calls');
+            })
+            ->with(['assignedTo:id,name', 'classSection.school:id,name'])
+            ->orderBy('id')
+            ->get(['id', 'name', 'assigned_to', 'class_section_id', 'total_calls']);
+    }
+
+    /**
+     * @param  Collection<int,int>|array<int,int>  $schoolIds
+     * @return array<int, array{id: int, name: string, total_students: int, blocking: int, can_delete: bool}>
+     */
+    public function schoolDeletionPreview(Collection|array $schoolIds): array
+    {
+        $schoolIds = collect($schoolIds)->map(fn ($id) => (int) $id)->filter()->unique()->values();
+
+        return School::query()
+            ->whereIn('id', $schoolIds)
+            ->orderBy('name')
+            ->get(['id', 'name'])
+            ->map(function (School $school) {
+                $classIds = ClassSection::where('school_id', $school->id)->pluck('id');
+                $base = Student::withTrashed()->whereIn('class_section_id', $classIds);
+                $total = (clone $base)->count();
+                $blocking = $this->assignedCalledStudentsInSchools([$school->id])->count();
+
+                return [
+                    'id' => (int) $school->id,
+                    'name' => $school->name,
+                    'total_students' => $total,
+                    'blocking' => $blocking,
+                    'can_delete' => $blocking === 0,
+                ];
+            })
+            ->values()
+            ->all();
+    }
+
+    /**
      * Delete students (and dependents) plus campaign rows that reference them; reconcile campaigns.
      *
      * @param  Collection<int,int>|array<int,int>  $studentIds

@@ -29,30 +29,81 @@
                         <li>{{ __('Staff user accounts') }} ({{ number_format($counts['staff_users']) }})</li>
                     </ul>
 
-                    <form method="POST" action="{{ route('admin.reset-data.perform') }}" class="space-y-5 pt-2">
+                    @php
+                        $scopeValue = old('scope', 'students');
+                        $selectedSchoolId = (int) collect(old('school_ids', []))->first();
+                    @endphp
+                    <form method="POST" action="{{ route('admin.reset-data.perform') }}" class="space-y-5 pt-2" id="resetDataForm">
                         @csrf
                         <div>
                             <label for="scope" class="block text-sm font-medium text-slate-700">{{ __('Delete scope') }}</label>
                             <select id="scope" name="scope" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 text-sm">
-                                <option value="all" {{ old('scope') === 'all' ? 'selected' : '' }}>{{ __('Everything — schools, sessions, classes, students, campaigns, imports, staff logins') }}</option>
-                                <option value="school" {{ old('scope') === 'school' ? 'selected' : '' }}>{{ __('Selected school(s) only + classes/students/history inside') }}</option>
-                                <option value="class_section" {{ old('scope') === 'class_section' ? 'selected' : '' }}>{{ __('Selected class/section(s) only + students/history inside') }}</option>
-                                <option value="students" {{ old('scope', 'students') === 'students' ? 'selected' : '' }}>{{ __('Selected students only (by ID) + their history') }}</option>
+                                <option value="all" {{ $scopeValue === 'all' ? 'selected' : '' }}>{{ __('Everything — schools, sessions, classes, students, campaigns, imports, staff logins') }}</option>
+                                <option value="school" {{ $scopeValue === 'school' ? 'selected' : '' }}>{{ __('Delete full school — classes, students, imports & history inside') }}</option>
+                                <option value="class_section" {{ $scopeValue === 'class_section' ? 'selected' : '' }}>{{ __('Selected class/section(s) only + students/history inside') }}</option>
+                                <option value="students" {{ $scopeValue === 'students' ? 'selected' : '' }}>{{ __('Selected students only (by ID) + their history') }}</option>
                             </select>
                             @error('scope')
                                 <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
                             @enderror
                         </div>
 
-                        <div id="studentsBlock">
-                            <label for="student_ids" class="block text-sm font-medium text-slate-700">{{ __('Student IDs (comma or space separated)') }}</label>
-                            <textarea id="student_ids" name="student_ids" rows="3" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 text-sm" placeholder="101, 102, 203">{{ old('student_ids') }}</textarea>
-                            @error('student_ids')
+                        <div id="schoolBlock" class="{{ $scopeValue === 'school' ? '' : 'hidden' }} space-y-3">
+                            <p class="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
+                                {{ __('A school can only be deleted when no student is both assigned to staff and already called. Uncalled assigned leads and unassigned students in that school will be removed.') }}
+                            </p>
+                            <div>
+                                <label for="school_id" class="block text-sm font-medium text-slate-700">{{ __('Select school to delete') }}</label>
+                                <select id="school_id" name="school_ids[]" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 text-sm">
+                                    <option value="">{{ __('— Choose a school —') }}</option>
+                                    @foreach ($schools as $school)
+                                        @php
+                                            $preview = collect($schoolDeletionPreview ?? [])->firstWhere('id', $school->id);
+                                        @endphp
+                                        <option value="{{ $school->id }}" @selected($selectedSchoolId === $school->id) @disabled($preview && ! $preview['can_delete'])>
+                                            {{ $school->name }}
+                                            @if ($preview)
+                                                ({{ $preview['blocking'] > 0 ? __(':blocking assigned+called — blocked', ['blocking' => $preview['blocking']]) : __('OK to delete') }})
+                                            @endif
+                                        </option>
+                                    @endforeach
+                                </select>
+                                <p class="mt-1 text-xs text-slate-500">{{ __('Schools marked “blocked” cannot be deleted until those leads are handled.') }}</p>
+                            </div>
+                            <div class="overflow-x-auto rounded-md border border-slate-200">
+                                <table class="min-w-full text-xs text-slate-700">
+                                    <thead class="bg-slate-50 text-left">
+                                        <tr>
+                                            <th class="px-3 py-2 font-medium">{{ __('School') }}</th>
+                                            <th class="px-3 py-2 font-medium">{{ __('Students') }}</th>
+                                            <th class="px-3 py-2 font-medium">{{ __('Assigned + called (blocks delete)') }}</th>
+                                            <th class="px-3 py-2 font-medium">{{ __('Status') }}</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-slate-100">
+                                        @foreach ($schoolDeletionPreview ?? [] as $row)
+                                            <tr>
+                                                <td class="px-3 py-2">{{ $row['name'] }}</td>
+                                                <td class="px-3 py-2">{{ number_format($row['total_students']) }}</td>
+                                                <td class="px-3 py-2">{{ number_format($row['blocking']) }}</td>
+                                                <td class="px-3 py-2">
+                                                    @if ($row['can_delete'])
+                                                        <span class="text-green-700 font-medium">{{ __('Can delete') }}</span>
+                                                    @else
+                                                        <span class="text-red-700 font-medium">{{ __('Blocked') }}</span>
+                                                    @endif
+                                                </td>
+                                            </tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
+                            </div>
+                            @error('school_ids')
                                 <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
                             @enderror
                         </div>
 
-                        <div id="classBlock" class="hidden">
+                        <div id="classBlock" class="{{ $scopeValue === 'class_section' ? '' : 'hidden' }}">
                             <label for="class_section_ids" class="block text-sm font-medium text-slate-700">{{ __('Select class/section(s)') }}</label>
                             <select id="class_section_ids" name="class_section_ids[]" multiple size="8" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 text-sm">
                                 @foreach ($classSections as $classSection)
@@ -66,16 +117,10 @@
                             @enderror
                         </div>
 
-                        <div id="schoolBlock" class="hidden">
-                            <label for="school_ids" class="block text-sm font-medium text-slate-700">{{ __('Select school(s)') }}</label>
-                            <select id="school_ids" name="school_ids[]" multiple size="8" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 text-sm">
-                                @foreach ($schools as $school)
-                                    <option value="{{ $school->id }}" @selected(collect(old('school_ids', []))->contains($school->id))>
-                                        {{ $school->name }}
-                                    </option>
-                                @endforeach
-                            </select>
-                            @error('school_ids')
+                        <div id="studentsBlock" class="{{ $scopeValue === 'students' ? '' : 'hidden' }}">
+                            <label for="student_ids" class="block text-sm font-medium text-slate-700">{{ __('Student IDs (comma or space separated)') }}</label>
+                            <textarea id="student_ids" name="student_ids" rows="3" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 text-sm" placeholder="101, 102, 203">{{ old('student_ids') }}</textarea>
+                            @error('student_ids')
                                 <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
                             @enderror
                         </div>
@@ -120,29 +165,42 @@
             </div>
         </div>
     </div>
-</x-app-layout>
-<script>
-    (function () {
-        const scopeEl = document.getElementById('scope');
-        const studentsBlock = document.getElementById('studentsBlock');
-        const classBlock = document.getElementById('classBlock');
-        const schoolBlock = document.getElementById('schoolBlock');
 
-        const submitBtn = document.getElementById('submitDelete');
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const scopeEl = document.getElementById('scope');
+            const studentsBlock = document.getElementById('studentsBlock');
+            const classBlock = document.getElementById('classBlock');
+            const schoolBlock = document.getElementById('schoolBlock');
+            const submitBtn = document.getElementById('submitDelete');
+            const schoolSelect = document.getElementById('school_id');
+            const studentIds = document.getElementById('student_ids');
+            const classSelect = document.getElementById('class_section_ids');
 
-        function syncScopeBlocks() {
-            const scope = scopeEl?.value || 'students';
-            studentsBlock?.classList.toggle('hidden', scope !== 'students');
-            classBlock?.classList.toggle('hidden', scope !== 'class_section');
-            schoolBlock?.classList.toggle('hidden', scope !== 'school');
-            if (submitBtn) {
-                submitBtn.textContent = scope === 'all'
-                    ? {{ json_encode(__('Delete everything listed above')) }}
-                    : {{ json_encode(__('Run deletion')) }};
+            function setBlockVisible(block, visible) {
+                if (!block) return;
+                block.classList.toggle('hidden', !visible);
+                block.querySelectorAll('input, select, textarea').forEach(function (el) {
+                    el.disabled = !visible;
+                });
             }
-        }
 
-        scopeEl?.addEventListener('change', syncScopeBlocks);
-        syncScopeBlocks();
-    })();
-</script>
+            function syncScopeBlocks() {
+                const scope = scopeEl ? scopeEl.value : 'students';
+                setBlockVisible(studentsBlock, scope === 'students');
+                setBlockVisible(classBlock, scope === 'class_section');
+                setBlockVisible(schoolBlock, scope === 'school');
+                if (submitBtn) {
+                    submitBtn.textContent = scope === 'all'
+                        ? @json(__('Delete everything listed above'))
+                        : @json(__('Run deletion'));
+                }
+            }
+
+            if (scopeEl) {
+                scopeEl.addEventListener('change', syncScopeBlocks);
+                syncScopeBlocks();
+            }
+        });
+    </script>
+</x-app-layout>

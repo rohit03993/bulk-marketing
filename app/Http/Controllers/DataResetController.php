@@ -45,12 +45,15 @@ class DataResetController extends Controller
         ];
 
         $schools = School::orderBy('name')->get(['id', 'name']);
+        $schoolDeletionPreview = collect(
+            $this->crmDataReset->schoolDeletionPreview($schools->pluck('id'))
+        )->values();
         $classSections = ClassSection::with('school')
             ->orderBy('class_name')
             ->orderBy('section_name')
             ->get(['id', 'school_id', 'class_name', 'section_name']);
 
-        return view('admin.reset-data', compact('counts', 'schools', 'classSections'));
+        return view('admin.reset-data', compact('counts', 'schools', 'classSections', 'schoolDeletionPreview'));
     }
 
     /**
@@ -86,6 +89,27 @@ class DataResetController extends Controller
 
         if ($scope === 'school' && $schoolIds->isEmpty()) {
             return back()->withErrors(['school_ids' => __('Select at least one school.')])->withInput();
+        }
+
+        if ($scope === 'school') {
+            $blocking = $this->crmDataReset->assignedCalledStudentsInSchools($schoolIds);
+            if ($blocking->isNotEmpty()) {
+                $sampleIds = $blocking->take(15)->pluck('id')->join(', ');
+                $extra = $blocking->count() > 15
+                    ? ' '.__('and :count more', ['count' => $blocking->count() - 15])
+                    : '';
+
+                return back()->withErrors([
+                    'school_ids' => __(
+                        'Cannot delete: :count student(s) in this school are assigned to staff and already have call history. Only uncalled assigned leads (or unassigned students) can be removed with a school delete. Reassign or resolve those leads first. Student IDs: :ids:extra',
+                        [
+                            'count' => $blocking->count(),
+                            'ids' => $sampleIds,
+                            'extra' => $extra,
+                        ]
+                    ),
+                ])->withInput();
+            }
         }
         if ($scope === 'class_section' && $classSectionIds->isEmpty()) {
             return back()->withErrors(['class_section_ids' => __('Select at least one class/section.')])->withInput();
